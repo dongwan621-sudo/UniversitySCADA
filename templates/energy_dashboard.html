@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Energy Dashboard — SCADA</title>
+<link rel="stylesheet" href="/static/css/scada.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+  body { overflow:auto; background:var(--bg0); }
+  .dash-layout {
+    padding: 20px 20px 20px;
+    display: flex; flex-direction: column; gap: 16px;
+    min-height: 100%;
+  }
+  .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+  .charts-row { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  .charts-row-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .chart-card {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:12px; padding:16px; overflow:hidden;
+  }
+  .chart-card-title {
+    font-size:10px; font-weight:700; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--cyan); margin-bottom:12px;
+  }
+  .time-btns { display:flex; gap:6px; }
+  .time-btn {
+    padding:3px 10px; border-radius:4px; font-size:10px;
+    border:1px solid var(--border); background:none;
+    color:var(--text3); cursor:pointer; letter-spacing:0.5px;
+    transition:0.2s;
+  }
+  .time-btn.active,
+  .time-btn:hover { background:var(--cyan-dim); color:var(--cyan); border-color:var(--cyan); }
+  .cop-gauge-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav class="topnav">
+  <a class="topnav-brand" href="/"><div class="logo-dot"></div><span>IntelliSCADA</span></a>
+  <div class="topnav-links">
+    <a href="/">Overview</a>
+    <a href="/chiller-plant">Chiller Plant</a>
+    <a href="/energy-dashboard" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Energy
+    </a>
+  </div>
+  <div class="topnav-right">
+    <div class="status-indicator"><div class="status-dot"></div>LIVE</div>
+    <div class="topnav-clock" id="nav-clock">--:--:--</div>
+  </div>
+</nav>
+
+<div class="main-content" style="overflow-y:auto">
+<div class="dash-layout">
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">System COP (now)</div><div class="kpi-value green" id="kpi-cop">—</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">Total Power Now</div><div class="kpi-value" id="kpi-power">—<span class="kpi-unit">kW</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Cooling Load Now</div><div class="kpi-value" id="kpi-load">—<span class="kpi-unit">kW</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Active Chillers</div><div class="kpi-value" id="kpi-chn">—<span class="kpi-unit">/4</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">Outdoor Temp</div><div class="kpi-value" id="kpi-tout">—<span class="kpi-unit">°C</span></div></div>
+  </div>
+
+  <!-- COP Gauges Row -->
+  <div class="cop-gauge-row" id="cop-gauges">
+    <div class="chart-card"><div class="chart-card-title">CH-01 COP</div><div id="gauge1" style="height:140px"></div></div>
+    <div class="chart-card"><div class="chart-card-title">CH-02 COP</div><div id="gauge2" style="height:140px"></div></div>
+    <div class="chart-card"><div class="chart-card-title">CH-03 COP</div><div id="gauge3" style="height:140px"></div></div>
+    <div class="chart-card"><div class="chart-card-title">CH-04 COP</div><div id="gauge4" style="height:140px"></div></div>
+  </div>
+
+  <!-- Power trends row -->
+  <div class="chart-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="chart-card-title" style="margin-bottom:0">■ CHILLER POWER — ALL 4 UNITS  (kW)</div>
+      <div class="time-btns">
+        <button class="time-btn" onclick="loadPowerChart(24)">24H</button>
+        <button class="time-btn active" onclick="loadPowerChart(48)">48H</button>
+        <button class="time-btn" onclick="loadPowerChart(168)">WEEK</button>
+      </div>
+    </div>
+    <div id="chart-power" style="height:220px"></div>
+  </div>
+
+  <!-- COP trend + Load profile -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="chart-card-title" style="margin-bottom:0">■ SYSTEM COP TREND</div>
+        <div class="time-btns">
+          <button class="time-btn" onclick="loadCOPChart(24)">24H</button>
+          <button class="time-btn active" onclick="loadCOPChart(48)">48H</button>
+          <button class="time-btn" onclick="loadCOPChart(168)">WEEK</button>
+        </div>
+      </div>
+      <div id="chart-cop" style="height:200px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">■ LOAD vs OUTDOOR TEMP</div>
+      <div id="chart-load-scatter" style="height:200px"></div>
+    </div>
+  </div>
+
+  <!-- Per-chiller detail charts -->
+  <div class="charts-row-4">
+    <div class="chart-card">
+      <div class="chart-card-title">■ CH-01  POWER / COP</div>
+      <div id="chart-ch1" style="height:160px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">■ CH-02  POWER / COP</div>
+      <div id="chart-ch2" style="height:160px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">■ CH-03  POWER / COP</div>
+      <div id="chart-ch3" style="height:160px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">■ CH-04  POWER / COP</div>
+      <div id="chart-ch4" style="height:160px"></div>
+    </div>
+  </div>
+
+  <!-- Daily energy bar -->
+  <div class="chart-card">
+    <div class="chart-card-title">■ DAILY ENERGY CONSUMPTION  (kWh / chiller)</div>
+    <div id="chart-daily" style="height:180px"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function updateClock(){ document.getElementById('nav-clock').textContent=new Date().toTimeString().slice(0,8); }
+setInterval(updateClock,1000); updateClock();
+
+// ECharts base theme
+const baseTextStyle = { color:'#7aafc8', fontFamily:'JetBrains Mono, monospace', fontSize:10 };
+const gridStyle = { left:46, right:16, top:16, bottom:28 };
+const axisLine = { lineStyle:{color:'rgba(0,200,255,0.15)'} };
+const splitLine = { lineStyle:{color:'rgba(0,200,255,0.07)'} };
+
+// Gauge init
+function makeGauge(domId, label) {
+  const chart = echarts.init(document.getElementById(domId), null, {renderer:'canvas'});
+  chart.setOption({
+    backgroundColor:'transparent',
+    series:[{
+      type:'gauge', radius:'90%', startAngle:200, endAngle:-20,
+      min:0, max:8,
+      axisLine:{lineStyle:{width:10, color:[
+        [0.375, '#ff3b30'],[0.625,'#ff9500'],[0.875,'#00d4ff'],[1,'#00ff88']
+      ]}},
+      axisTick:{show:false},
+      splitLine:{show:false},
+      axisLabel:{color:'#3d6882',fontSize:9,distance:8},
+      pointer:{width:3,length:'60%',itemStyle:{color:'#00d4ff'}},
+      detail:{
+        valueAnimation:true, fontSize:22, fontWeight:700,
+        color:'#00ff88', offsetCenter:[0,'60%'],
+        formatter:'{value}',
+      },
+      title:{offsetCenter:[0,'80%'],fontSize:9,color:'#3d6882'},
+      data:[{value:0, name:label}],
+    }]
+  });
+  return chart;
+}
+
+const gauges = [
+  makeGauge('gauge1','COP'),
+  makeGauge('gauge2','COP'),
+  makeGauge('gauge3','COP'),
+  makeGauge('gauge4','COP'),
+];
+
+// Update KPIs + gauges from current data
+function updateKPIs() {
+  fetch('/api/current').then(r=>r.json()).then(d=>{
+    document.getElementById('kpi-cop').textContent   = d.system_cop.toFixed(3);
+    document.getElementById('kpi-power').innerHTML   = d.total_power_kw.toFixed(0)+'<span class="kpi-unit">kW</span>';
+    document.getElementById('kpi-load').innerHTML    = d.total_load_kw.toFixed(0)+'<span class="kpi-unit">kW</span>';
+    document.getElementById('kpi-chn').innerHTML     = d.n_chillers_on+'<span class="kpi-unit">/4</span>';
+    document.getElementById('kpi-tout').innerHTML    = d.T_out.toFixed(1)+'<span class="kpi-unit">°C</span>';
+    for(let cid=1;cid<=4;cid++){
+      const c = d.chillers[String(cid)];
+      gauges[cid-1].setOption({series:[{data:[{value: c.status?parseFloat(c.cop.toFixed(2)):0}]}]});
+    }
+  });
+}
+
+// Power trend chart
+let powerChart = null;
+function loadPowerChart(hours=48) {
+  fetch(`/api/chillers/week`).then(r=>r.json()).then(d=>{
+    const n = Math.round(hours*12);
+    const sl = d.ts.length;
+    const ts   = d.ts.slice(-n);
+    const ts_labels = ts.map(t=>t.slice(5,16).replace('T',' '));
+    if(!powerChart) powerChart = echarts.init(document.getElementById('chart-power'));
+
+    const colors = ['#00d4ff','#00ff88','#ff9500','#ff3b30'];
+    powerChart.setOption({
+      backgroundColor:'transparent', animation:false,
+      tooltip:{trigger:'axis', backgroundColor:'rgba(8,15,30,0.9)', borderColor:'rgba(0,200,255,0.3)',
+               textStyle:{color:'#e8f4fd',fontSize:11}},
+      legend:{data:['CH-01','CH-02','CH-03','CH-04'],bottom:0,
+              textStyle:{color:'#7aafc8',fontSize:10},
+              icon:'roundRect',itemWidth:16,itemHeight:3},
+      grid:{left:50,right:16,top:10,bottom:40},
+      xAxis:{type:'category', data:ts_labels, axisLabel:{...baseTextStyle,interval:'auto',rotate:0,
+             formatter:v=>v.slice(0,5)}, axisLine:axisLine, splitLine:splitLine},
+      yAxis:{type:'value', name:'kW', nameTextStyle:baseTextStyle, axisLabel:baseTextStyle,
+             axisLine:axisLine, splitLine:splitLine},
+      series: [1,2,3,4].map((cid,i)=>({
+        name:`CH-0${cid}`, type:'line', smooth:true, symbol:'none',
+        lineStyle:{width:1.5,color:colors[i]},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+          colorStops:[{offset:0,color:colors[i]+'44'},{offset:1,color:colors[i]+'00'}]}},
+        data: d[`ch${cid}_power`].slice(-n),
+      }))
+    });
+  });
+}
+
+// COP trend
+let copChart = null;
+function loadCOPChart(hours=48) {
+  fetch('/api/building/timeseries/'+hours).then(r=>r.json()).then(d=>{
+    const ts_labels = d.ts.map(t=>t.slice(5,16).replace('T',' '));
+    if(!copChart) copChart = echarts.init(document.getElementById('chart-cop'));
+    copChart.setOption({
+      backgroundColor:'transparent', animation:false,
+      tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:11}},
+      grid:{left:40,right:16,top:10,bottom:28},
+      xAxis:{type:'category',data:ts_labels,axisLabel:{...baseTextStyle,formatter:v=>v.slice(0,5)},axisLine:axisLine,splitLine:splitLine},
+      yAxis:{type:'value',name:'COP',nameTextStyle:baseTextStyle,axisLabel:baseTextStyle,min:0,max:7,axisLine:axisLine,splitLine:splitLine},
+      series:[
+        {name:'System COP',type:'line',smooth:true,symbol:'none',
+         lineStyle:{width:2,color:'#00ff88'},
+         areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#00ff8844'},{offset:1,color:'#00ff8800'}]}},
+         data:d.system_cop},
+        {name:'T_out /5',type:'line',smooth:true,symbol:'none',
+         lineStyle:{width:1,color:'#ff9500',type:'dashed'},
+         data:d.T_out.map(v=>v/5), tooltip:{valueFormatter:v=>(v*5).toFixed(1)+'°C'}}
+      ]
+    });
+  });
+}
+
+// Load vs outdoor scatter
+function loadScatter() {
+  fetch('/api/building/week').then(r=>r.json()).then(d=>{
+    const scChart = echarts.init(document.getElementById('chart-load-scatter'));
+    const pts = d.T_out.map((t,i)=>[t, d.total_load_kw[i]]);
+    scChart.setOption({
+      backgroundColor:'transparent', animation:false,
+      tooltip:{trigger:'item',formatter:p=>`T_out: ${p.value[0].toFixed(1)}°C<br>Load: ${p.value[1].toFixed(0)} kW`,
+               backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:11}},
+      grid:{left:50,right:16,top:10,bottom:28},
+      xAxis:{type:'value',name:'T_out (°C)',nameTextStyle:baseTextStyle,axisLabel:baseTextStyle,axisLine:axisLine,splitLine:splitLine},
+      yAxis:{type:'value',name:'Load kW',nameTextStyle:baseTextStyle,axisLabel:baseTextStyle,axisLine:axisLine,splitLine:splitLine},
+      series:[{type:'scatter',symbolSize:2.5,
+               itemStyle:{color:'rgba(0,212,255,0.4)'},
+               data:pts}]
+    });
+  });
+}
+
+// Per-chiller mini charts
+function loadChillerMinis() {
+  fetch('/api/chillers/week').then(r=>r.json()).then(d=>{
+    const colors=['#00d4ff','#00ff88','#ff9500','#ff3b30'];
+    [1,2,3,4].forEach(cid=>{
+      const ch = echarts.init(document.getElementById(`chart-ch${cid}`));
+      const ts_l = d.ts.map(t=>t.slice(5,16).replace('T',' '));
+      ch.setOption({
+        backgroundColor:'transparent', animation:false,
+        tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:10}},
+        legend:{data:['Power','COP×100'],bottom:0,textStyle:{color:'#7aafc8',fontSize:9},icon:'roundRect',itemWidth:12,itemHeight:2},
+        grid:{left:36,right:8,top:6,bottom:36},
+        xAxis:{type:'category',data:ts_l,axisLabel:{...baseTextStyle,show:false},axisLine:axisLine,splitLine:{show:false}},
+        yAxis:{type:'value',axisLabel:baseTextStyle,axisLine:axisLine,splitLine:splitLine},
+        series:[
+          {name:'Power',type:'line',smooth:true,symbol:'none',
+           lineStyle:{width:1.5,color:colors[cid-1]},data:d[`ch${cid}_power`]},
+          {name:'COP×100',type:'line',smooth:true,symbol:'none',
+           lineStyle:{width:1,color:'#ffffff44',type:'dashed'},
+           data:d[`ch${cid}_cop`].map(v=>v*100)}
+        ]
+      });
+    });
+  });
+}
+
+// Daily energy bar chart
+function loadDailyEnergy() {
+  fetch('/api/chillers/week').then(r=>r.json()).then(d=>{
+    // Aggregate per day (144 5-min points per day)
+    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const dailyPower = [[],[],[],[],[],[],[]];
+    d.ts.forEach((ts,i)=>{
+      const dt = new Date(ts);
+      const dow = dt.getDay() === 0 ? 6 : dt.getDay()-1;
+      for(let c=1;c<=4;c++){
+        if(!dailyPower[dow][c-1]) dailyPower[dow][c-1]=0;
+        dailyPower[dow][c-1] += (d[`ch${c}_power`][i]||0) * (5/60); // kWh
+      }
+    });
+    const barChart = echarts.init(document.getElementById('chart-daily'));
+    const cols=['#00d4ff','#00ff88','#ff9500','#ff3b30'];
+    barChart.setOption({
+      backgroundColor:'transparent', animation:false,
+      tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:11}},
+      legend:{data:['CH-01','CH-02','CH-03','CH-04'],bottom:0,textStyle:{color:'#7aafc8',fontSize:10},icon:'roundRect',itemWidth:14,itemHeight:3},
+      grid:{left:56,right:16,top:10,bottom:40},
+      xAxis:{type:'category',data:days,axisLabel:baseTextStyle,axisLine:axisLine,splitLine:{show:false}},
+      yAxis:{type:'value',name:'kWh',nameTextStyle:baseTextStyle,axisLabel:baseTextStyle,axisLine:axisLine,splitLine:splitLine},
+      series:[1,2,3,4].map((cid,i)=>({
+        name:`CH-0${cid}`,type:'bar',stack:'total',barMaxWidth:36,
+        itemStyle:{color:cols[i],borderRadius:cid===4?[4,4,0,0]:[0,0,0,0]},
+        data:dailyPower.map(day=>Math.round(day[i]||0))
+      }))
+    });
+  });
+}
+
+// Init all
+updateKPIs();
+loadPowerChart(48);
+loadCOPChart(48);
+loadScatter();
+loadChillerMinis();
+loadDailyEnergy();
+setInterval(updateKPIs, 10000);
+</script>
+</body>
+</html>

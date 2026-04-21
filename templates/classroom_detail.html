@@ -1,0 +1,677 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><title>Room Detail — LU Digital Twin</title>
+<link rel="stylesheet" href="/static/css/scada.css">
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+body{overflow:hidden}
+#c3d{position:fixed;top:52px;left:0;bottom:0;right:320px;display:block;z-index:1}
+.side-panel{position:fixed;top:52px;right:0;bottom:0;width:320px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;z-index:10}
+.side-section{padding:14px 14px 0;flex-shrink:0}
+.side-section:last-child{padding-bottom:14px}
+.info-bar{position:fixed;bottom:0;left:0;right:320px;height:56px;background:linear-gradient(0deg,rgba(4,8,15,0.97) 70%,transparent);z-index:10;display:flex;align-items:center;gap:14px;padding:0 20px}
+.ib-kpi{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.ib-label{font-size:9px;letter-spacing:1px;color:var(--text3)}
+.ib-val{font-size:16px;font-weight:700;font-family:monospace}
+.ib-sep{width:1px;height:36px;background:var(--border)}
+/* ── AC Feedback Dashboard (right panel) ── */
+.dash-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#13161f;border-bottom:1px solid var(--border);font-size:11px;flex-shrink:0}
+.dash-dot{width:8px;height:8px;border-radius:50%;background:#3a3f50;flex-shrink:0}
+.dash-dot.on{background:#00b894;box-shadow:0 0 6px #00b89488;animation:dpulse 1.5s infinite}
+.dash-dot.err{background:#e17055}
+@keyframes dpulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dash-status-val{color:#e8eaf0;font-weight:600;flex:1}
+.dash-total{background:#1e2130;border-radius:12px;padding:2px 10px;font-size:11px;white-space:nowrap;color:#8899aa}
+.dash-total strong{color:#00d4a0}
+.dash-scroll{flex:1;overflow-y:auto;padding:12px}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-card{background:#13161f;border-radius:10px;padding:10px 8px;text-align:center}
+.stat-emoji{font-size:20px;display:block;margin-bottom:3px}
+.stat-label-d{font-size:10px;color:#8899aa;margin-bottom:2px}
+.stat-count-d{font-size:20px;font-weight:800;line-height:1}
+.stat-pct-d{font-size:10px;color:#6b7a8d;margin-top:1px}
+.dash-section{background:#13161f;border-radius:10px;padding:12px;margin-bottom:12px}
+.dash-h2{font-size:11px;font-weight:600;color:#8899aa;margin-bottom:10px;letter-spacing:.5px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.bar-label{width:48px;font-size:10px;color:#8899aa;text-align:right;flex-shrink:0}
+.bar-wrap{flex:1;background:#1e2130;border-radius:4px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.bar-count{width:22px;font-size:10px;color:#6b7a8d;text-align:right;flex-shrink:0}
+.feed{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.feed-item{background:#1a1d27;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:10px;animation:fslide .3s ease}
+@keyframes fslide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.feed-emoji{font-size:20px;flex-shrink:0}
+.feed-feeling{font-size:13px;font-weight:700}
+.feed-time{font-size:10px;color:#5a6a7a;margin-top:1px}
+.feed-empty{color:#3a4a5a;font-size:12px;text-align:center;padding:20px 0}
+.setpt-box{background:#13161f;border-radius:10px;padding:12px;margin-bottom:12px}
+.setpt-slider{width:100%;margin-top:10px;accent-color:#00d4a0}
+.setpt-scale{display:flex;justify-content:space-between;font-size:10px;color:#6b7a8d;margin-top:2px}
+.setpt-msg{font-size:10px;color:#6b7a8d;margin-top:8px;min-height:14px}
+.left-setpt{position:fixed;top:66px;left:12px;width:240px;z-index:12;background:#13161f;border:1px solid var(--border);border-radius:10px;padding:12px}
+.left-occupancy{position:fixed;top:260px;left:12px;width:240px;z-index:12;background:#13161f;border:1px solid var(--border);border-radius:10px;padding:12px}
+.occ-big{font-size:26px;font-weight:700;color:#00d4a0;line-height:1}
+.left-humanload{position:fixed;top:395px;left:12px;width:240px;z-index:12;background:#13161f;border:1px solid var(--border);border-radius:10px;padding:12px}
+.hl-big{font-size:24px;font-weight:700;color:#74b9ff;line-height:1}
+</style></head><body>
+<div class="grid-bg"></div>
+<nav class="topnav">
+  <a class="topnav-brand" href="/"><div class="logo-dot"></div><span>LU Digital Twin</span></a>
+  <div class="topnav-links">
+    <a href="/">Overview</a>
+    <a href="/floor/{{ floor_id }}" id="nav-floor">{{ floor_id }}</a>
+    <a href="#" class="active" id="nav-room">{{ room_id }}</a>
+  </div>
+  <div class="topnav-right">
+    <div class="status-indicator"><div class="status-dot"></div>LIVE</div>
+    <div class="topnav-clock" id="clk">--:--:--</div>
+  </div>
+</nav>
+
+<canvas id="c3d"></canvas>
+<div class="left-setpt">
+  <div class="dash-h2">TEMP ADJUST</div>
+  <div style="font-size:12px;color:#d7e1f1">Setpoint: <strong data-setpt-now>--°C</strong></div>
+  <input class="setpt-slider" type="range" min="18" max="36" step="0.5" value="24" data-setpt-slider>
+  <div class="setpt-scale"><span>18°C</span><span>36°C</span></div>
+  <div class="setpt-msg" data-setpt-msg>Drag to set target temperature (range 18-36°C)</div>
+</div>
+<div class="left-occupancy">
+  <div class="dash-h2">INDOOR OCCUPANCY</div>
+  <div class="occ-big"><span id="occ-count">--</span> / <span id="occ-cap">--</span></div>
+  <div style="font-size:11px;color:#9fb2c6;margin-top:3px">People in room</div>
+  <div style="font-size:11px;color:#6b7a8d;margin-top:6px">Occupancy rate: <span id="occ-rate">--%</span></div>
+</div>
+<div class="left-humanload">
+  <div class="dash-h2">PEOPLE THERMAL IMPACT</div>
+  <div style="font-size:11px;color:#9fb2c6">Avg body temp</div>
+  <div class="hl-big"><span id="avg-body-temp">--</span>°C</div>
+  <div style="font-size:11px;color:#9fb2c6;margin-top:8px">Cooling load from people</div>
+  <div style="font-size:18px;font-weight:700;color:#00d4a0"><span id="people-load-kw">--</span> kW</div>
+  <div style="font-size:11px;color:#6b7a8d;margin-top:3px">≈ <span id="people-load-tr">--</span> TR</div>
+</div>
+
+<!-- bottom info bar -->
+<div class="info-bar">
+  <div class="ib-kpi"><div class="ib-label">TEMPERATURE</div><div class="ib-val cyan" id="ib-temp">—°C</div></div>
+  <div class="ib-sep"></div>
+  <div class="ib-kpi"><div class="ib-label">HUMIDITY</div><div class="ib-val" id="ib-hum">— %</div></div>
+  <div class="ib-sep"></div>
+  <div class="ib-kpi"><div class="ib-label">CO₂</div><div class="ib-val orange" id="ib-co2">— ppm</div></div>
+  <div class="ib-sep"></div>
+  <div class="ib-kpi"><div class="ib-label">OCCUPANCY</div><div class="ib-val green" id="ib-occ">— %</div></div>
+  <div class="ib-sep"></div>
+  <div class="ib-kpi"><div class="ib-label">AC VALVE</div><div class="ib-val" id="ib-valve">— %</div></div>
+  <div class="ib-sep"></div>
+  <div class="ib-kpi"><div class="ib-label">AC SET PT</div><div class="ib-val cyan" id="ib-setpt">—°C</div></div>
+</div>
+
+<!-- RIGHT panel — AC Feedback Dashboard -->
+<div class="side-panel">
+  <!-- MQTT status bar -->
+  <div class="dash-status">
+    <div class="dash-dot" id="dash-dot"></div>
+    <span class="dash-status-val" id="dash-status">Connecting…</span>
+    <div class="dash-total">Total <strong id="dash-total">0</strong></div>
+  </div>
+
+  <div class="dash-scroll">
+    <!-- room label -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);margin-bottom:10px">■ {{ room_id }} · 空调体感反馈</div>
+
+    <!-- 8-feeling stat cards -->
+    <div class="stats-grid" id="dash-stats"></div>
+
+    <div class="setpt-box">
+      <div class="dash-h2">TEMP ADJUST</div>
+      <div style="font-size:12px;color:#d7e1f1">Setpoint: <strong data-setpt-now>--°C</strong></div>
+      <input class="setpt-slider" type="range" min="18" max="36" step="0.5" value="24" data-setpt-slider>
+      <div class="setpt-scale"><span>18°C</span><span>36°C</span></div>
+      <div class="setpt-msg" data-setpt-msg>Drag to set target temperature (range 18-36°C)</div>
+    </div>
+
+    <!-- bar chart -->
+    <div class="dash-section">
+      <div class="dash-h2">📊 感受分布</div>
+      <div id="dash-bars"></div>
+    </div>
+
+    <!-- live feed -->
+    <div class="dash-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="dash-h2" style="margin-bottom:0">📡 实时消息流</div>
+        <button onclick="clearFeed()" style="background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text3);font-size:10px;padding:3px 8px;cursor:pointer">清空</button>
+      </div>
+      <div class="feed" id="dash-feed">
+        <div class="feed-empty">等待接收用户反馈…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FLOOR_ID = "{{ floor_id }}";
+const ROOM_ID  = "{{ room_id }}";
+const IS_LIB   = ROOM_ID.startsWith('LIB');
+let ROOM_CAP = 100;
+
+setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);
+
+fetch('/api/meta').then(r=>r.json()).then(meta=>{
+  if(meta && meta[ROOM_ID] && Number(meta[ROOM_ID].cap)>0){
+    ROOM_CAP = Number(meta[ROOM_ID].cap);
+    document.getElementById('occ-cap').textContent = String(ROOM_CAP);
+  }
+}).catch(()=>{});
+
+// ── Bottom bar data (sensor readings) ────────────────────────────────────────
+function updateData(){
+  fetch(`/api/room/${ROOM_ID}/timeseries`).then(r=>r.json()).then(d=>{
+    const last=d.temp.length-1;
+    document.getElementById('ib-temp').textContent=d.temp[last].toFixed(1)+'°C';
+    document.getElementById('ib-hum').textContent=d.humidity[last].toFixed(0)+' %';
+    document.getElementById('ib-co2').textContent=d.co2[last].toFixed(0)+' ppm';
+    document.getElementById('ib-occ').textContent=(d.occupancy[last]*100).toFixed(0)+' %';
+    document.getElementById('ib-valve').textContent=d.ac_valve[last].toFixed(0)+' %';
+  }).catch(()=>{});
+  fetch('/api/current').then(r=>r.json()).then(d=>{
+    const r=d.rooms[ROOM_ID]||{};
+    const setptVal=Number(r.ac_setpt||24);
+    const setpt=setptVal.toFixed(1)+'°C';
+    const roomTemp=Number(r.temp||24);
+    const occRate=Math.max(0, Math.min(1, Number(r.occupancy||0)));
+    const occCount=Math.round(occRate*ROOM_CAP);
+    const avgBodyTemp=36.6 + Math.max(-0.3, Math.min(0.5, (roomTemp-24)*0.03));
+    const sensiblePerPersonW=75 + (avgBodyTemp-36.6)*20;
+    const peopleLoadKW=(occCount*sensiblePerPersonW)/1000;
+    const peopleLoadTR=peopleLoadKW/3.517;
+    document.getElementById('ib-setpt').textContent=setpt;
+    updateSetptDisplays(setptVal);
+    document.getElementById('ib-valve').textContent=(r.ac_valve||0).toFixed(0)+' %';
+    document.getElementById('occ-count').textContent=String(occCount);
+    document.getElementById('occ-cap').textContent=String(ROOM_CAP);
+    document.getElementById('occ-rate').textContent=(occRate*100).toFixed(0)+'%';
+    document.getElementById('avg-body-temp').textContent=avgBodyTemp.toFixed(1);
+    document.getElementById('people-load-kw').textContent=peopleLoadKW.toFixed(2);
+    document.getElementById('people-load-tr').textContent=peopleLoadTR.toFixed(2);
+  }).catch(()=>{});
+}
+updateData();
+setInterval(updateData,15000);
+
+// ── AC Feedback Dashboard (MQTT) ──────────────────────────────────────────────
+const BROKER     = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC      = 'ac-feedback/responses';
+const TOPIC_STAT = 'ac-feedback/stats';
+const FEED_KEY   = 'ac_feed_v1';
+const MAX_FEED   = 50;
+
+const FEELINGS = [
+  {feeling:'很冷',   emoji:'🥶', color:'#74b9ff'},
+  {feeling:'有点冷', emoji:'🌨️', color:'#a29bfe'},
+  {feeling:'微凉',   emoji:'🌤️', color:'#55efc4'},
+  {feeling:'刚刚好', emoji:'😊', color:'#00b894'},
+  {feeling:'有点暖', emoji:'🌞', color:'#fdcb6e'},
+  {feeling:'有点热', emoji:'😅', color:'#e17055'},
+  {feeling:'很热',   emoji:'🥵', color:'#e84393'},
+  {feeling:'极热',   emoji:'🔥', color:'#d63031'},
+];
+
+const counts = {}; FEELINGS.forEach(f=>counts[f.feeling]=0);
+let dashTotal=0, retainedLoaded=false, mqttClient=null;
+let setptBusy=false, pendingSetpoint=null, currentSetpoint=24, setpointDebounce=null;
+
+function loadFeedCache(){ try{return JSON.parse(localStorage.getItem(FEED_KEY))||[];}catch(e){return[];} }
+function saveFeedCache(items){ localStorage.setItem(FEED_KEY,JSON.stringify(items.slice(0,MAX_FEED))); }
+
+function renderDashStatic(){
+  document.getElementById('dash-stats').innerHTML = FEELINGS.map(f=>`
+    <div class="stat-card">
+      <span class="stat-emoji">${f.emoji}</span>
+      <div class="stat-label-d">${f.feeling}</div>
+      <div class="stat-count-d" id="dcnt-${f.feeling}" style="color:${f.color}">0</div>
+      <div class="stat-pct-d"   id="dpct-${f.feeling}">—</div>
+    </div>`).join('');
+  document.getElementById('dash-bars').innerHTML = FEELINGS.map(f=>`
+    <div class="bar-row">
+      <div class="bar-label">${f.emoji} ${f.feeling}</div>
+      <div class="bar-wrap"><div class="bar-fill" id="dbar-${f.feeling}" style="background:${f.color};width:0%"></div></div>
+      <div class="bar-count" id="dbc-${f.feeling}">0</div>
+    </div>`).join('');
+}
+
+function updateDash(){
+  document.getElementById('dash-total').textContent=dashTotal;
+  FEELINGS.forEach(f=>{
+    const c=counts[f.feeling]||0, pct=dashTotal?Math.round(c/dashTotal*100):0;
+    document.getElementById('dcnt-'+f.feeling).textContent=c;
+    document.getElementById('dpct-'+f.feeling).textContent=dashTotal?pct+'%':'—';
+    document.getElementById('dbar-'+f.feeling).style.width=pct+'%';
+    document.getElementById('dbc-'+f.feeling).textContent=c;
+  });
+}
+
+function addFeedItem(data, prepend=true, save=true){
+  const feed=document.getElementById('dash-feed');
+  const empty=feed.querySelector('.feed-empty'); if(empty) empty.remove();
+  const f=FEELINGS.find(x=>x.feeling===data.feeling)||{emoji:'❓',color:'#aaa'};
+  const time=new Date(data.timestamp||Date.now()).toLocaleTimeString('zh-CN');
+  const el=document.createElement('div'); el.className='feed-item';
+  el.innerHTML=`<div class="feed-emoji">${f.emoji}</div>
+    <div style="flex:1">
+      <div class="feed-feeling" style="color:${f.color}">${data.feeling}</div>
+      <div class="feed-time">${time} · ${(data.client||'').slice(0,12)||'匿名'}</div>
+    </div>`;
+  if(prepend) feed.insertBefore(el,feed.firstChild); else feed.appendChild(el);
+  const items=feed.querySelectorAll('.feed-item'); if(items.length>MAX_FEED) items[items.length-1].remove();
+  if(save){ const c=loadFeedCache(); c.unshift({feeling:data.feeling,timestamp:data.timestamp||new Date().toISOString(),client:data.client||''}); saveFeedCache(c); }
+}
+
+function clearFeed(){
+  localStorage.removeItem(FEED_KEY);
+  document.getElementById('dash-feed').innerHTML='<div class="feed-empty">等待接收用户反馈…</div>';
+}
+
+function restoreCache(){ loadFeedCache().forEach(item=>addFeedItem(item,false,false)); }
+
+function initMQTT(){
+  mqttClient=mqtt.connect(BROKER,{clientId:'lu-dt-'+Math.random().toString(16).slice(2,10),clean:true,connectTimeout:8000,reconnectPeriod:3000});
+  mqttClient.on('connect',()=>{
+    document.getElementById('dash-dot').className='dash-dot on';
+    document.getElementById('dash-status').textContent='Connected to broker.hivemq.com';
+    mqttClient.subscribe([TOPIC,TOPIC_STAT],{qos:1});
+  });
+  mqttClient.on('message',(topic,payload)=>{
+    const raw=payload.toString(); if(!raw) return;
+    try{
+      const data=JSON.parse(raw);
+      if(topic===TOPIC_STAT){
+        if(!retainedLoaded){ retainedLoaded=true; FEELINGS.forEach(f=>{const v=data[f.feeling];if(v){counts[f.feeling]=v;dashTotal+=v;}}); updateDash(); }
+        return;
+      }
+      if(data.feeling){ counts[data.feeling]=(counts[data.feeling]||0)+1; dashTotal++; updateDash(); addFeedItem(data); }
+    }catch(e){}
+  });
+  mqttClient.on('error',()=>{ document.getElementById('dash-dot').className='dash-dot err'; document.getElementById('dash-status').textContent='Connection failed, retrying…'; });
+  mqttClient.on('close',()=>{ document.getElementById('dash-dot').className='dash-dot err'; document.getElementById('dash-status').textContent='Disconnected, reconnecting…'; });
+}
+
+function setAdjustDisabled(disabled){
+  document.querySelectorAll('[data-setpt-slider]').forEach(slider=>{ slider.disabled=disabled; });
+}
+
+function updateSetptDisplays(value){
+  currentSetpoint=value;
+  const setpt=value.toFixed(1)+'°C';
+  document.querySelectorAll('[data-setpt-now]').forEach(el=>{ el.textContent=setpt; });
+  document.querySelectorAll('[data-setpt-slider]').forEach(slider=>{ slider.value=String(value); });
+}
+
+function showSetptMsg(msg, isErr=false){
+  document.querySelectorAll('[data-setpt-msg]').forEach(el=>{
+    el.textContent=msg;
+    el.style.color=isErr?'#ff8a8a':'#6b7a8d';
+  });
+}
+
+function applySetpoint(target){
+  pendingSetpoint=target;
+  if(setptBusy) return;
+  setptBusy=true;
+  setAdjustDisabled(true);
+  const toSend=pendingSetpoint;
+  pendingSetpoint=null;
+  fetch(`/api/room/${ROOM_ID}/setpoint`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({setpoint:toSend})
+  }).then(async r=>{
+    if(!r.ok){
+      let msg='Update failed';
+      try{
+        const err=await r.json();
+        if(err && err.description) msg=err.description;
+      }catch(e){}
+      throw new Error(msg);
+    }
+    return r.json();
+  }).then(d=>{
+    updateSetptDisplays(Number(d.ac_setpt));
+    document.getElementById('ib-setpt').textContent=Number(d.ac_setpt).toFixed(1)+'°C';
+    showSetptMsg(`Setpoint updated to ${Number(d.ac_setpt).toFixed(1)}°C`);
+  }).catch(e=>{
+    showSetptMsg(e.message||'Update failed, please retry.', true);
+  }).finally(()=>{
+    if(pendingSetpoint!==null){
+      setptBusy=false;
+      applySetpoint(pendingSetpoint);
+      return;
+    }
+    setptBusy=false;
+    setAdjustDisabled(false);
+  });
+}
+
+document.querySelectorAll('[data-setpt-slider]').forEach(slider=>{
+  slider.addEventListener('input',()=>{
+    const next=Number(slider.value);
+    updateSetptDisplays(next);
+    showSetptMsg(`Target ${next.toFixed(1)}°C, auto-applying...`);
+    if(setpointDebounce) clearTimeout(setpointDebounce);
+    setpointDebounce=setTimeout(()=>applySetpoint(next), 250);
+  });
+});
+
+renderDashStatic();
+restoreCache();
+initMQTT();
+
+// ── Three.js setup ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c3d');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.4;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc8e8f4);
+
+const camera = new THREE.PerspectiveCamera(48,1,.5,200);
+camera.position.set(0, 6, 18);
+camera.lookAt(0,2,0);
+
+const ctrl = new THREE.OrbitControls(camera, renderer.domElement);
+ctrl.enableDamping=true; ctrl.dampingFactor=0.07;
+ctrl.minDistance=5; ctrl.maxDistance=60;
+ctrl.maxPolarAngle=Math.PI/2.05;
+ctrl.target.set(0,2,0);
+
+// SKY visible through windows
+const skyGeo=new THREE.SphereGeometry(150,24,12);
+const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,
+  uniforms:{top:{value:new THREE.Color(0x1e78c8)},bot:{value:new THREE.Color(0xd0ecfa)}},
+  vertexShader:`varying vec3 vP;void main(){vP=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform vec3 top,bot;varying vec3 vP;void main(){float h=normalize(vP+100.).y;gl_FragColor=vec4(mix(bot,top,pow(max(h,0.),.55)),1.);}`
+});
+scene.add(new THREE.Mesh(skyGeo,skyMat));
+
+// SUN
+const sun=new THREE.DirectionalLight(0xfff8e8,2.5);
+sun.position.set(60,100,-60); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=sun.shadow.camera.bottom=-30;
+sun.shadow.camera.right=sun.shadow.camera.top=30;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xfff0e0,1.0));
+scene.add(Object.assign(new THREE.HemisphereLight(0x87ceeb,0x5aaa44,.35)));
+const fillLight=new THREE.PointLight(0xfff8f0,.6,40);
+fillLight.position.set(-6,5,6); scene.add(fillLight);
+
+// ── ROOM GEOMETRY ─────────────────────────────────────────────────────────────
+const RW = IS_LIB?22:16, RD=IS_LIB?14:12, RH=3.2;
+
+// FLOOR
+const floorMat=new THREE.MeshStandardMaterial({color:0xd4b884,roughness:.75});
+const floor=new THREE.Mesh(new THREE.BoxGeometry(RW,0.12,RD),floorMat);
+floor.position.set(0,-.06,0); floor.receiveShadow=true; scene.add(floor);
+
+// Floor tile grid lines
+const groutMat=new THREE.MeshBasicMaterial({color:0xc0a870,transparent:true,opacity:.4});
+for(let x=-RW/2;x<=RW/2;x+=1.2){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(.04,.01,RD),groutMat);m.position.set(x,.001,0);scene.add(m);
+}
+for(let z=-RD/2;z<=RD/2;z+=1.2){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(RW,.01,.04),groutMat);m.position.set(0,.001,z);scene.add(m);
+}
+
+// WALLS
+const wallMat=new THREE.MeshStandardMaterial({color:0xf0ece4,roughness:.85});
+const glassMat=new THREE.MeshStandardMaterial({color:0x88c8e8,roughness:.05,metalness:.6,transparent:true,opacity:.55});
+
+// Back wall (solid)
+const bkW=new THREE.Mesh(new THREE.BoxGeometry(RW,RH,.15),wallMat);
+bkW.position.set(0,RH/2,-RD/2); bkW.castShadow=true; bkW.receiveShadow=true; scene.add(bkW);
+
+// Side walls (solid)
+[-RW/2,RW/2].forEach(sx=>{
+  const sw=new THREE.Mesh(new THREE.BoxGeometry(.15,RH,RD),wallMat);
+  sw.position.set(sx,RH/2,0); sw.receiveShadow=true; scene.add(sw);
+});
+
+// Front wall — glass panels with frame
+const nPanels=IS_LIB?6:4;
+const panelW=(RW-0.3)/nPanels;
+for(let p=0;p<nPanels;p++){
+  const px=-RW/2+0.15+p*panelW+panelW/2;
+  // frame
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(panelW,.2,0.12),new THREE.MeshStandardMaterial({color:0xc0b8a8,roughness:.6}));
+  frame.position.set(px,.1,RD/2); scene.add(frame);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(panelW,.2,0.12),new THREE.MeshStandardMaterial({color:0xc0b8a8,roughness:.6}));
+  top.position.set(px,RH-.1,RD/2); scene.add(top);
+  // glass
+  const glassP=new THREE.Mesh(new THREE.BoxGeometry(panelW-0.08,RH-.45,0.08),glassMat);
+  glassP.position.set(px,RH/2,RD/2); scene.add(glassP);
+  // vertical divider
+  const div=new THREE.Mesh(new THREE.BoxGeometry(0.06,RH,0.1),new THREE.MeshStandardMaterial({color:0xc0b8a8,roughness:.6}));
+  div.position.set(px-panelW/2,RH/2,RD/2); scene.add(div);
+}
+
+// CEILING
+// ceiling removed — open top view
+
+// Ceiling lights (fluorescent tubes)
+const lightMat=new THREE.MeshStandardMaterial({color:0xffffee,emissive:0xffffaa,emissiveIntensity:1.2});
+const nLights=IS_LIB?4:3;
+for(let l=0;l<nLights;l++){
+  const lx=(l-(nLights-1)/2)*(RW/(nLights));
+  const tube=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.06,RD*.5),lightMat);
+  tube.position.set(lx,RH-.04,0); scene.add(tube);
+  const ptLight=new THREE.PointLight(0xfff8e8,.4,12);
+  ptLight.position.set(lx,RH-0.1,0); scene.add(ptLight);
+}
+
+// ── FURNITURE ─────────────────────────────────────────────────────────────────
+const deskMat=new THREE.MeshStandardMaterial({color:0xc8a868,roughness:.7});
+const legMat=new THREE.MeshStandardMaterial({color:0x6a5040,roughness:.8});
+const boardMat=new THREE.MeshStandardMaterial({color:0x1a2a1a,roughness:.9});
+const screenMat=new THREE.MeshStandardMaterial({color:0x223344,roughness:.2,emissive:0x102030,emissiveIntensity:.4});
+
+function createQRTexture(){
+  const c=document.createElement('canvas');
+  c.width=128; c.height=128;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,128,128);
+  ctx.fillStyle='#111';
+  for(let y=0;y<16;y++){
+    for(let x=0;x<16;x++){
+      const edge=(x<5&&y<5)||(x>10&&y<5)||(x<5&&y>10);
+      const seed=((x*13+y*17+x*y*3)%7)<3;
+      if(edge||seed) ctx.fillRect(x*8,y*8,8,8);
+    }
+  }
+  const tex=new THREE.CanvasTexture(c);
+  tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate=true;
+  return tex;
+}
+
+const qrMat=new THREE.MeshBasicMaterial({map:createQRTexture(),transparent:false});
+function addDeskQR(x,y,z,size=.16){
+  const qr=new THREE.Mesh(new THREE.PlaneGeometry(size,size),qrMat);
+  qr.rotation.x=-Math.PI/2;
+  qr.position.set(x,y,z);
+  scene.add(qr);
+}
+
+function addSeatedPerson(x,z,dir=0,seatY=.53){
+  const g=new THREE.Group();
+  const cloth=[0x4b6cb7,0x7f5a3a,0x4a7f5a][Math.floor(Math.random()*3)];
+  const shirtMat=new THREE.MeshStandardMaterial({color:cloth,roughness:.85});
+  const skinMat=new THREE.MeshStandardMaterial({color:0xd8b79b,roughness:.9});
+  const pantMat=new THREE.MeshStandardMaterial({color:0x2f3542,roughness:.9});
+
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(.28,.38,.18),shirtMat);
+  torso.position.set(0,seatY+.26,0.02); torso.castShadow=true; g.add(torso);
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.05,10),skinMat);
+  neck.position.set(0,seatY+.48,0.03); g.add(neck);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.11,14,12),skinMat);
+  head.position.set(0,seatY+.6,0.03); head.castShadow=true; g.add(head);
+
+  const upperLegGeo=new THREE.CylinderGeometry(.045,.05,.22,10);
+  const lowerLegGeo=new THREE.CylinderGeometry(.04,.04,.24,10);
+  [[-.08,.06],[.08,.06]].forEach(([lx,lz])=>{
+    const thigh=new THREE.Mesh(upperLegGeo,pantMat);
+    thigh.position.set(lx,seatY+.08,lz); thigh.rotation.x=Math.PI/2.2; g.add(thigh);
+    const calf=new THREE.Mesh(lowerLegGeo,pantMat);
+    calf.position.set(lx,seatY-.08,lz+.18); g.add(calf);
+  });
+
+  const armGeo=new THREE.CylinderGeometry(.028,.03,.24,10);
+  [[-.16,.12,.65],[.16,.12,-.65]].forEach(([ax,az,rz])=>{
+    const arm=new THREE.Mesh(armGeo,skinMat);
+    arm.position.set(ax,seatY+.27,az); arm.rotation.z=rz; g.add(arm);
+  });
+
+  g.position.set(x,0,z); g.rotation.y=dir;
+  scene.add(g);
+}
+
+if(!IS_LIB){
+  // ── CLASSROOM: projector screen + rows of desks ───────────────────────────
+  // Projector screen on back wall
+  const screen=new THREE.Mesh(new THREE.BoxGeometry(RW*.7,.1,1.8),boardMat);
+  screen.position.set(0,RH*.6,-RD/2+.12); scene.add(screen);
+  const screenSurface=new THREE.Mesh(new THREE.BoxGeometry(RW*.7-.1,.02,1.7),new THREE.MeshStandardMaterial({color:0xd8e8f0,roughness:.2,emissive:0x4488cc,emissiveIntensity:.12}));
+  screenSurface.position.set(0,RH*.6,-RD/2+.18); scene.add(screenSurface);
+  // Screen label
+  const projectorBox=new THREE.Mesh(new THREE.BoxGeometry(.6,.2,.2),new THREE.MeshStandardMaterial({color:0x202030}));
+  projectorBox.position.set(0,RH-.05,0); scene.add(projectorBox);
+
+  // Lectern
+  const lect=new THREE.Mesh(new THREE.BoxGeometry(1.4,.8,.7),deskMat);
+  lect.position.set(0,.4,-RD/2+1.5); lect.castShadow=true; scene.add(lect);
+
+  // Student desks in rows
+  const nRows=3, nCols=5;
+  const rowZ=Array.from({length:nRows},(_,r)=>-RD/2+3.2+r*2.8);
+  const colX=Array.from({length:nCols},(_,c)=>-RW/2+1.2+c*(RW-2)/nCols+(RW-2)/(nCols*2));
+
+  rowZ.forEach(rz=>{
+    colX.forEach(cx=>{
+      // desk top
+      const d=new THREE.Mesh(new THREE.BoxGeometry(1.1,.06,.6),deskMat);
+      d.position.set(cx,.72,rz); d.castShadow=true; scene.add(d);
+      addDeskQR(cx+.42,.755,rz+.2,.055);
+      // legs
+      [[-.45,-.25],[.45,-.25],[-.45,.25],[.45,.25]].forEach(([lx,lz])=>{
+        const leg=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.72,6),legMat);
+        leg.position.set(cx+lx,.36,rz+lz); scene.add(leg);
+      });
+      // chair
+      const seat=new THREE.Mesh(new THREE.BoxGeometry(.7,.05,.6),new THREE.MeshStandardMaterial({color:0x5070a0,roughness:.7}));
+      seat.position.set(cx,.45,rz+.75); scene.add(seat);
+      const back=new THREE.Mesh(new THREE.BoxGeometry(.7,.4,.05),new THREE.MeshStandardMaterial({color:0x5070a0,roughness:.7}));
+      back.position.set(cx,.68,rz+1.05); scene.add(back);
+    });
+  });
+
+  // AC unit on side wall
+  const ac=new THREE.Mesh(new THREE.BoxGeometry(2,.3,.2),new THREE.MeshStandardMaterial({color:0xe8e8e8,roughness:.6}));
+  ac.position.set(RW/2-.12,RH*.75,0); ac.rotation.y=Math.PI/2; scene.add(ac);
+  const acVent=new THREE.Mesh(new THREE.BoxGeometry(1.8,.05,.05),new THREE.MeshStandardMaterial({color:0x88b8d8,roughness:.3,transparent:true,opacity:.7}));
+  acVent.position.set(RW/2-.14,RH*.75-.15,0); acVent.rotation.y=Math.PI/2; scene.add(acVent);
+
+} else {
+  // ── LIBRARY: bookshelves + reading tables ─────────────────────────────────
+  const shelfMat=new THREE.MeshStandardMaterial({color:0x8b6040,roughness:.8});
+  const bookColors=[0xa83030,0x3060a8,0x308050,0x808030,0x803080,0x306080];
+
+  // Bookshelves along side walls
+  const shelfPositions=[];
+  for(let i=0;i<3;i++) shelfPositions.push([-RW/2+0.6, .9, -RD/2+1.5+i*3.5]);
+  for(let i=0;i<3;i++) shelfPositions.push([RW/2-0.6, .9, -RD/2+1.5+i*3.5]);
+
+  shelfPositions.forEach(([sx,sy,sz])=>{
+    const shelf=new THREE.Mesh(new THREE.BoxGeometry(.35,1.8,2.8),shelfMat);
+    shelf.position.set(sx,sy,sz); shelf.castShadow=true; scene.add(shelf);
+    // books on each shelf
+    for(let r=0;r<3;r++){
+      let bx=sx-(sx<0?.12:-.12);
+      for(let b=0;b<8;b++){
+        const bw=.06+Math.random()*.06;
+        const book=new THREE.Mesh(new THREE.BoxGeometry(bw,.48,.25),
+          new THREE.MeshStandardMaterial({color:bookColors[(b+r*3)%6],roughness:.8}));
+        book.position.set(bx, sy-.55+r*.55, sz-.95+b*.25); scene.add(book);
+        bx+=(sx<0?1:-1)*bw;
+      }
+    }
+  });
+
+  // Reading tables
+  const tablePositions=[
+    [0,.4,-3],[0,.4,0],[0,.4,3],
+    [-5,.4,-2],[-5,.4,2],[5,.4,-2],[5,.4,2]
+  ];
+  tablePositions.forEach(([tx,ty,tz])=>{
+    const table=new THREE.Mesh(new THREE.BoxGeometry(2.4,.08,1.2),deskMat);
+    table.position.set(tx,ty+.08,tz); table.castShadow=true; scene.add(table);
+    addDeskQR(tx+0.95,ty+.13,tz+0.42,.09);
+    // legs
+    [[1.0,.5],[1.0,-.5],[-1.0,.5],[-1.0,-.5]].forEach(([lx,lz])=>{
+      const leg=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.45,6),legMat);
+      leg.position.set(tx+lx,.22,tz+lz); scene.add(leg);
+    });
+    // chairs around table
+    [[0,.9],[0,-.9],[1.575,0],[-1.575,0]].forEach(([cx,cz])=>{
+      const seat=new THREE.Mesh(new THREE.BoxGeometry(.55,.05,.5),new THREE.MeshStandardMaterial({color:0x607090,roughness:.7}));
+      seat.position.set(tx+cx,.45+.08,tz+cz); scene.add(seat);
+      // One person on each seat to simulate occupied study area
+      let face=0;
+      if(cz>0.1) face=Math.PI;
+      else if(cz<-0.1) face=0;
+      else if(cx>0.1) face=-Math.PI/2;
+      else if(cx<-0.1) face=Math.PI/2;
+      addSeatedPerson(tx+cx,tz+cz,face,.53);
+    });
+  });
+
+  // Study carrels along back wall
+  for(let i=0;i<(IS_LIB?5:3);i++){
+    const cx=-RW/2+1.5+i*3.5;
+    const carrel=new THREE.Mesh(new THREE.BoxGeometry(2,.06,1),deskMat);
+    carrel.position.set(cx,.72,-RD/2+1.2); carrel.castShadow=true; scene.add(carrel);
+    addDeskQR(cx+.75,.755,-RD/2+1.55,.065);
+    const monitor=new THREE.Mesh(new THREE.BoxGeometry(.6,.4,.04),screenMat);
+    monitor.position.set(cx,.98,-RD/2+.82); scene.add(monitor);
+  }
+
+  // AC units
+  [[-1,0],[1,0]].forEach(([sign,])=>{
+    const ac=new THREE.Mesh(new THREE.BoxGeometry(3,.3,.2),new THREE.MeshStandardMaterial({color:0xe8e8e8,roughness:.6}));
+    ac.position.set(sign*RW*.3,RH*.75,0); scene.add(ac);
+  });
+}
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function onResize(){
+  const w=window.innerWidth-320, h=window.innerHeight-52;
+  renderer.setSize(w,h,false);
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',onResize);
+onResize();
+setTimeout(onResize,0);
+
+// ── Animate ───────────────────────────────────────────────────────────────────
+function animate(t){
+  requestAnimationFrame(animate); ctrl.update();
+  fillLight.intensity=.5+.1*Math.sin(t*.001);
+  renderer.render(scene,camera);
+}
+animate(0);
+
+</script>
+</body></html>

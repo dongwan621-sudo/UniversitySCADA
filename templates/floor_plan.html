@@ -1,0 +1,435 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><title>Floor Plan — LU Digital Twin</title>
+<link rel="stylesheet" href="/static/css/scada.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+body{overflow:hidden}
+.layout{display:grid;grid-template-columns:220px 1fr 240px;height:100%;gap:0}
+.left-panel{background:var(--bg1);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.center-area{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,#b8c8d8 0%,#8898a8 100%)}
+.right-panel{background:var(--bg1);border-left:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+#floor-canvas{border:2px solid rgba(160,140,100,0.5);border-radius:10px;background:#f0ece4;box-shadow:0 4px 24px rgba(0,0,0,0.25)}
+.room-tile{position:absolute;border:2px solid rgba(160,140,100,0.35);cursor:pointer;transition:.15s;overflow:hidden;background:transparent}
+.room-tile:hover{border-color:rgba(0,200,255,0.7);z-index:10;background:rgba(0,200,255,0.06)}
+.room-tile-label{position:absolute;top:6px;left:8px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(40,30,10,0.6);background:rgba(255,255,255,0.6);border-radius:4px;padding:2px 6px}
+.room-tile-temp{position:absolute;bottom:6px;right:8px;font-size:11px;font-weight:700}
+.floor-tab{padding:6px 18px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:11px;font-family:monospace;letter-spacing:.5px;transition:.2s}
+.floor-tab.active,.floor-tab:hover{background:var(--cyan-dim);color:var(--cyan);border-color:var(--cyan)}
+.legend-bar{width:180px;height:10px;border-radius:5px;background:linear-gradient(90deg,#0066ff,#00d4ff,#00ff88,#ffcc00,#ff3b30)}
+</style></head><body>
+<div class="grid-bg"></div>
+<nav class="topnav">
+  <a class="topnav-brand" href="/"><div class="logo-dot"></div><span>LU Digital Twin</span></a>
+  <div class="topnav-links">
+    <a href="/">Overview</a>
+    <a href="/floor/GF" id="nav-gf">G/F</a>
+    <a href="/floor/1F" id="nav-1f">1/F</a>
+  </div>
+  <div class="topnav-right">
+    <div class="status-indicator"><div class="status-dot"></div>LIVE</div>
+    <div class="topnav-clock" id="clk">--:--:--</div>
+  </div>
+</nav>
+
+<div class="main-content"><div class="layout">
+
+<!-- LEFT -->
+<div class="left-panel">
+  <div class="panel-title">■ FLOOR SELECTOR</div>
+  <div style="display:flex;gap:8px">
+    <button class="floor-tab" id="tab-gf" onclick="switchFloor('GF')">G/F</button>
+    <button class="floor-tab" id="tab-1f" onclick="switchFloor('1F')">1/F</button>
+  </div>
+  <div class="panel-title mt-8">■ ROOM STATS</div>
+  <div class="panel" style="padding:12px">
+    <div class="stat-row"><span class="stat-label">Avg Temp</span><span class="stat-value cyan" id="s-temp">—°C</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Humidity</span><span class="stat-value" id="s-hum">— %</span></div>
+    <div class="stat-row"><span class="stat-label">Avg CO₂</span><span class="stat-value orange" id="s-co2">— ppm</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Occupancy</span><span class="stat-value green" id="s-occ">— %</span></div>
+    <div class="stat-row"><span class="stat-label">AC Units ON</span><span class="stat-value" id="s-ac">—</span></div>
+  </div>
+  <div class="panel-title mt-8">■ THERMAL LEGEND</div>
+  <div class="panel" style="padding:12px">
+    <div class="legend-bar"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px">
+      <span style="font-size:9px;color:#0066ff">21°C</span>
+      <span style="font-size:9px;color:#00d4ff">23°C</span>
+      <span style="font-size:9px;color:#00ff88">25°C</span>
+      <span style="font-size:9px;color:#ff9500">27°C</span>
+      <span style="font-size:9px;color:#ff3b30">29°C</span>
+    </div>
+  </div>
+  <div class="panel-title mt-8">■ TEMP TREND (24H)</div>
+  <div id="trend-chart" style="height:150px"></div>
+</div>
+
+<!-- CENTER: canvas + tile overlays -->
+<div class="center-area">
+  <div style="position:absolute;top:12px;left:0;right:0;text-align:center">
+    <span style="font-size:11px;font-weight:700;letter-spacing:2px;color:var(--cyan)" id="center-title">GROUND FLOOR — PLAN VIEW</span>
+  </div>
+  <div id="plan-wrap" style="position:relative">
+    <canvas id="floor-canvas"></canvas>
+    <!-- room tiles injected by JS -->
+  </div>
+  <div style="position:absolute;bottom:12px;left:0;right:0;text-align:center">
+    <span style="font-size:10px;color:var(--text3)">Click any room to view details</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="right-panel">
+  <div class="panel-title">■ RECENT FEEDBACK</div>
+  <div id="feedback-list" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto"></div>
+  <div class="panel-title mt-10">■ CO₂ TREND (24H)</div>
+  <div id="co2-chart" style="height:130px"></div>
+  <div class="panel-title mt-8">■ HUMIDITY TREND</div>
+  <div id="hum-chart" style="height:130px"></div>
+  <div class="panel-title mt-8">■ QUICK NAV</div>
+  <div id="room-links" style="display:flex;flex-direction:column;gap:5px"></div>
+</div>
+
+</div></div>
+
+<script>
+const FLOOR_ID = "{{ floor_id }}";
+let curFloor = FLOOR_ID;
+
+setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);
+
+// Highlight nav
+document.getElementById('nav-gf').className = FLOOR_ID==='GF'?'active':'';
+document.getElementById('nav-1f').className = FLOOR_ID==='1F'?'active':'';
+
+function switchFloor(f){ window.location.href='/floor/'+f; }
+
+// ── colour helpers ──────────────────────────────────────────────────────────
+function tempToRGB(temp){
+  const t=Math.max(0,Math.min(1,(temp-21)/8));
+  const stops=[[0,[0,102,255]],[.25,[0,212,255]],[.5,[0,255,136]],[.75,[255,204,0]],[1,[255,59,48]]];
+  let r=0,g=0,b=0;
+  for(let i=0;i<stops.length-1;i++){
+    const[s0,c0]=stops[i],[s1,c1]=stops[i+1];
+    if(t>=s0&&t<=s1){const p=(t-s0)/(s1-s0);r=c0[0]+(c1[0]-c0[0])*p;g=c0[1]+(c1[1]-c0[1])*p;b=c0[2]+(c1[2]-c0[2])*p;break;}
+  }
+  return[Math.round(r),Math.round(g),Math.round(b)];
+}
+function tempToHex(temp){const[r,g,b]=tempToRGB(temp);return`#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;}
+function tempToRGBA(temp,a){const[r,g,b]=tempToRGB(temp);return`rgba(${r},${g},${b},${a})`;}
+
+// ── GF drawing: 4 classrooms ────────────────────────────────────────────────
+const GF_ROOMS = [
+  {id:'MBG1',x:0,  y:0,  w:290,h:190,label:'MBG1 — Classroom'},
+  {id:'MBG2',x:290,y:0,  w:290,h:190,label:'MBG2 — Classroom'},
+  {id:'MBG3',x:0,  y:210,w:290,h:190,label:'MBG3 — Classroom'},
+  {id:'MBG4',x:290,y:210,w:290,h:190,label:'MBG4 — Classroom'},
+];
+const GF_W=580,GF_H=400;
+
+// ── 1F drawing: library ──────────────────────────────────────────────────────
+const LIB_W=720,LIB_H=380;
+// LIB-L: left reading area, LIB-C: central, LIB-R: right
+const LF_ROOMS = [
+  {id:'LIB-L',x:0,  y:0,w:228,h:380,label:'LIB-L  Library West'},
+  {id:'LIB-C',x:252,y:0,w:216,h:380,label:'LIB-C  Central'},
+  {id:'LIB-R',x:492,y:0,w:228,h:380,label:'LIB-R  Library East'},
+];
+
+function drawGF(ctx, temps, occs){
+  ctx.clearRect(0,0,GF_W,GF_H);
+  // corridor strip
+  ctx.fillStyle='#c8c0b4';ctx.fillRect(0,190,GF_W,20);
+  ctx.fillStyle='#b8b0a4';ctx.fillRect(288,0,4,400);
+  ctx.fillStyle='#b8b0a4';ctx.fillRect(0,188,GF_W,4);
+
+  GF_ROOMS.forEach(rm=>{
+    const temp=temps[rm.id]||24, occ=occs[rm.id]||.5;
+    drawClassroomContent(ctx, rm.x, rm.y, rm.w, rm.h, temp, occ, rm.id);
+  });
+
+  // wall border
+  ctx.strokeStyle='rgba(100,90,70,0.7)';ctx.lineWidth=3;
+  ctx.strokeRect(1,1,GF_W-2,GF_H-2);
+}
+
+function drawLibrary(ctx, temps, occs){
+  ctx.clearRect(0,0,LIB_W,LIB_H);
+  // overall floor
+  ctx.fillStyle='#e8e2d8';ctx.fillRect(0,0,LIB_W,LIB_H);
+
+  // corridors between zones
+  ctx.fillStyle='#ccc8c0';
+  ctx.fillRect(228,0,24,LIB_H); // left corridor
+  ctx.fillRect(468,0,24,LIB_H); // right corridor
+
+  // stairwell bumps at top center
+  ctx.fillStyle='#b8b4a8';
+  ctx.strokeStyle='rgba(100,90,70,0.5)';ctx.lineWidth=1.5;
+  [[228,0,60,55],[408,0,60,55]].forEach(([x,y,w,h])=>{
+    ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
+    ctx.font='8px monospace';ctx.fillStyle='#706860';ctx.textAlign='center';
+    ctx.fillText('STAIR',x+w/2,y+h/2+3); ctx.textAlign='left';
+    ctx.fillStyle='#b8b4a8';
+  });
+
+  LF_ROOMS.forEach(rm=>{
+    const temp=temps[rm.id]||24, occ=occs[rm.id]||.4;
+    drawLibraryZone(ctx, rm.x, rm.y, rm.w, rm.h, temp, occ, rm.id);
+  });
+
+  // border
+  ctx.strokeStyle='rgba(100,90,70,0.7)';ctx.lineWidth=3;
+  ctx.strokeRect(1,1,LIB_W-2,LIB_H-2);
+}
+
+// ── draw classroom interior ──────────────────────────────────────────────────
+function drawClassroomContent(ctx, x0, y0, w, h, temp, occ, id){
+  // floor
+  ctx.fillStyle='#f2ede4';ctx.fillRect(x0,y0,w,h);
+
+  // carpet texture
+  ctx.strokeStyle='rgba(200,190,170,0.3)';ctx.lineWidth=0.5;
+  for(let lx=x0+8;lx<x0+w;lx+=8){ctx.beginPath();ctx.moveTo(lx,y0);ctx.lineTo(lx,y0+h);ctx.stroke();}
+  for(let ly=y0+8;ly<y0+h;ly+=8){ctx.beginPath();ctx.moveTo(x0,ly);ctx.lineTo(x0+w,ly);ctx.stroke();}
+
+  // thermal tint
+  ctx.fillStyle=tempToRGBA(temp,.09);ctx.fillRect(x0,y0,w,h);
+
+  // window strip (top)
+  const skyG=ctx.createLinearGradient(0,y0,0,y0+18);
+  skyG.addColorStop(0,'#87cef0');skyG.addColorStop(1,'rgba(200,230,250,0)');
+  ctx.fillStyle=skyG;ctx.fillRect(x0+2,y0,w-4,18);
+  ctx.strokeStyle='rgba(160,180,200,0.5)';ctx.lineWidth=0.8;
+  for(let wx=x0+30;wx<x0+w;wx+=28){ctx.beginPath();ctx.moveTo(wx,y0);ctx.lineTo(wx,y0+18);ctx.stroke();}
+
+  // blackboard / projector screen
+  const bw=w*.55, bx=x0+(w-bw)/2, by=y0+22;
+  ctx.fillStyle='#1a2a1a';ctx.fillRect(bx,by,bw,18);
+  ctx.fillStyle='rgba(80,150,100,0.4)';ctx.fillRect(bx+3,by+2,bw-6,14);
+  ctx.font='7px monospace';ctx.fillStyle='rgba(200,230,200,0.8)';ctx.textAlign='center';
+  ctx.fillText('PROJECTOR SCREEN',x0+w/2,by+12);ctx.textAlign='left';
+
+  // desk rows (3 rows, desks per row)
+  const nCols=5, nRows=3;
+  const dw=Math.min((w-40)/nCols,28), dh=14;
+  const rowH=(h-70)/nRows;
+  for(let row=0;row<nRows;row++){
+    for(let col=0;col<nCols;col++){
+      const dx=x0+20+col*(dw+4), dy=y0+55+row*rowH;
+      const hasStudent=Math.random()<occ;
+      // desk shadow
+      ctx.fillStyle='rgba(0,0,0,0.1)';ctx.fillRect(dx+1,dy+1,dw,dh);
+      // desk
+      ctx.fillStyle=hasStudent?'#c8a868':'#d8b878';ctx.fillRect(dx,dy,dw,dh);
+      ctx.strokeStyle='rgba(160,130,80,0.6)';ctx.lineWidth=0.7;ctx.strokeRect(dx,dy,dw,dh);
+      // chair
+      ctx.beginPath();ctx.arc(dx+dw/2,dy+dh+6,4,0,Math.PI*2);
+      ctx.fillStyle=hasStudent?'#7080a0':'#b0b0b8';ctx.fill();
+      // person
+      if(hasStudent){
+        ctx.beginPath();ctx.arc(dx+dw/2,dy+dh+4,3.5,0,Math.PI*2);
+        ctx.fillStyle=['#3a5a8c','#8c3a4a','#3a7c5a','#8c7a3a'][col%4];ctx.fill();
+        ctx.beginPath();ctx.arc(dx+dw/2,dy+dh+1,2.5,0,Math.PI*2);
+        ctx.fillStyle='#f0c090';ctx.fill();
+      }
+    }
+  }
+
+  // AC unit indicator (top right)
+  ctx.fillStyle='rgba(255,255,255,0.7)';ctx.fillRect(x0+w-30,y0+20,26,10);
+  ctx.strokeStyle='rgba(0,180,220,0.5)';ctx.lineWidth=0.8;ctx.strokeRect(x0+w-30,y0+20,26,10);
+  ctx.font='6px monospace';ctx.fillStyle='#0099cc';ctx.textAlign='center';
+  ctx.fillText('AC',x0+w-17,y0+28);ctx.textAlign='left';
+}
+
+// ── draw library zone ────────────────────────────────────────────────────────
+function drawLibraryZone(ctx, x0, y0, w, h, temp, occ, id){
+  ctx.fillStyle='#f4f0e8';ctx.fillRect(x0,y0,w,h);
+  // texture
+  ctx.strokeStyle='rgba(200,190,170,0.25)';ctx.lineWidth=0.5;
+  for(let lx=x0+10;lx<x0+w;lx+=10){ctx.beginPath();ctx.moveTo(lx,y0);ctx.lineTo(lx,y0+h);ctx.stroke();}
+  for(let ly=y0+10;ly<y0+h;ly+=10){ctx.beginPath();ctx.moveTo(x0,ly);ctx.lineTo(x0+w,ly);ctx.stroke();}
+  // thermal tint
+  ctx.fillStyle=tempToRGBA(temp,.09);ctx.fillRect(x0,y0,w,h);
+
+  // bookshelves along back wall
+  const shelfH=16, shelfGap=20;
+  const colors=['#8b5e3c','#5e8b3c','#3c5e8b','#8b3c5e','#8b7a3c'];
+  for(let row=0;row<3;row++){
+    const sy=y0+8+row*(shelfH+shelfGap);
+    ctx.fillStyle='#6b4a2a';ctx.fillRect(x0+5,sy,w-10,shelfH);
+    // books
+    let bx=x0+6;
+    while(bx<x0+w-6){
+      const bw=5+Math.floor(Math.random()*5);
+      ctx.fillStyle=colors[Math.floor(Math.random()*5)];
+      ctx.fillRect(bx,sy+1,bw,shelfH-2);
+      ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.3;ctx.strokeRect(bx,sy+1,bw,shelfH-2);
+      bx+=bw+1;
+    }
+  }
+
+  // reading tables
+  const tW=Math.min(w-30,80), tH=20;
+  const tables = id==='LIB-C'
+    ? [[x0+w/2-tW/2, y0+90],[x0+w/2-tW/2,y0+130],[x0+w/2-tW/2,y0+165],[x0+w/2-tW/2,y0+200],[x0+w/2-tW/2,y0+240],[x0+w/2-tW/2,y0+280]]
+    : [[x0+10,y0+90],[x0+w-10-tW,y0+90],[x0+10,y0+130],[x0+w-10-tW,y0+130],[x0+10,y0+175],[x0+w-10-tW,y0+175],[x0+10,y0+215],[x0+w-10-tW,y0+215],[x0+10,y0+260],[x0+w-10-tW,y0+260]];
+  tables.forEach(([tx,ty])=>{
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.08)';ctx.fillRect(tx+2,ty+2,tW,tH);
+    // table
+    ctx.fillStyle='#d8b878';ctx.fillRect(tx,ty,tW,tH);
+    ctx.strokeStyle='rgba(160,130,80,0.5)';ctx.lineWidth=0.7;ctx.strokeRect(tx,ty,tW,tH);
+    // people at table
+    const seats=Math.floor(tW/14);
+    for(let s=0;s<seats;s++){
+      if(Math.random()<occ){
+        const px=tx+7+s*14;
+        ctx.beginPath();ctx.arc(px,ty+tH+7,4.5,0,Math.PI*2);
+        ctx.fillStyle=colors[s%5];ctx.fill();
+        ctx.beginPath();ctx.arc(px,ty+tH+4,3,0,Math.PI*2);
+        ctx.fillStyle='#f0c090';ctx.fill();
+      }
+    }
+  });
+
+  // window strip
+  const skyG=ctx.createLinearGradient(0,y0,0,y0+14);
+  skyG.addColorStop(0,'#87cef0');skyG.addColorStop(1,'rgba(200,230,250,0)');
+  ctx.fillStyle=skyG;ctx.fillRect(x0+1,y0,w-2,14);
+}
+
+// ── inject tile overlays ─────────────────────────────────────────────────────
+let trendChart, co2Chart, humChart;
+let currentRooms = [];
+
+function buildTiles(rooms, canvasW, canvasH){
+  const wrap = document.getElementById('plan-wrap');
+  wrap.querySelectorAll('.room-tile').forEach(t=>t.remove());
+  const canvas = document.getElementById('floor-canvas');
+  canvas.width = canvasW; canvas.height = canvasH;
+  canvas.style.width = canvasW+'px'; canvas.style.height = canvasH+'px';
+  wrap.style.width = canvasW+'px'; wrap.style.height = canvasH+'px';
+
+  rooms.forEach(rm=>{
+    const tile = document.createElement('div');
+    tile.className='room-tile';
+    tile.style.cssText=`left:${rm.x}px;top:${rm.y}px;width:${rm.w}px;height:${rm.h}px`;
+    tile.innerHTML=`<div class="room-tile-label">${rm.id}</div><div class="room-tile-temp" id="ttmp-${rm.id}">—°C</div>`;
+    tile.onclick=()=>{ window.location.href=`/classroom/${curFloor}/${rm.id}`; };
+    wrap.appendChild(tile);
+  });
+}
+
+function renderFloor(data){
+  const rooms = curFloor==='GF'?GF_ROOMS:LF_ROOMS;
+  const temps={}, occs={};
+  rooms.forEach(rm=>{
+    const d=data.rooms[rm.id]||{};
+    temps[rm.id]=d.temp||24;
+    occs[rm.id]=d.occupancy||.4;
+    const el=document.getElementById('ttmp-'+rm.id);
+    if(el){ el.textContent=(d.temp||24).toFixed(1)+'°C'; el.style.color=tempToHex(d.temp||24); }
+  });
+  const canvas=document.getElementById('floor-canvas');
+  const ctx=canvas.getContext('2d');
+  if(curFloor==='GF') drawGF(ctx,temps,occs);
+  else drawLibrary(ctx,temps,occs);
+
+  // sidebar stats (avg of current floor rooms)
+  let tSum=0,hSum=0,cSum=0,oSum=0,acOn=0,n=0;
+  rooms.forEach(rm=>{
+    const d=data.rooms[rm.id]||{};
+    tSum+=d.temp||0; hSum+=d.humidity||0; cSum+=d.co2||0; oSum+=d.occupancy||0;
+    if(d.ac_on) acOn++; n++;
+  });
+  document.getElementById('s-temp').textContent=(tSum/n||0).toFixed(1)+'°C';
+  document.getElementById('s-hum').textContent=(hSum/n||0).toFixed(0)+' %';
+  document.getElementById('s-co2').textContent=(cSum/n||0).toFixed(0)+' ppm';
+  document.getElementById('s-occ').textContent=((oSum/n||0)*100).toFixed(0)+' %';
+  document.getElementById('s-ac').textContent=`${acOn} / ${n}`;
+}
+
+function scoreLabel(s){ return['','🥶 Very Cold','❄️ Cold','😊 OK','🌡️ Warm','🔥 Hot'][s]||''; }
+function scoreBadge(s){ return['','badge-cyan','badge-cyan','badge-green','badge-orange','badge-red'][s]||''; }
+
+function loadFeedback(){
+  fetch(`/api/feedback/floor/${curFloor}`).then(r=>r.json()).then(events=>{
+    const sorted=events.slice(-25).reverse();
+    document.getElementById('feedback-list').innerHTML=sorted.map(e=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border2)">
+        <span style="font-size:10px;color:var(--text3)">${e.ts.slice(5,16).replace('T',' ')} ${e.room}</span>
+        <span class="badge ${scoreBadge(e.score)}">${scoreLabel(e.score)}</span>
+      </div>
+    `).join('');
+  }).catch(()=>{});
+}
+
+function loadCharts(firstRoomId){
+  fetch(`/api/room/${firstRoomId}/timeseries`).then(r=>r.json()).then(d=>{
+    const labels=d.ts.map(t=>t.slice(11,16));
+    const baseTextStyle={color:'#7aafc8',fontFamily:'monospace',fontSize:10};
+    const axisLine={lineStyle:{color:'rgba(0,200,255,0.15)'}};
+    const splitLine={lineStyle:{color:'rgba(0,200,255,0.07)'}};
+
+    if(!trendChart) trendChart=echarts.init(document.getElementById('trend-chart'));
+    trendChart.setOption({backgroundColor:'transparent',animation:false,
+      tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:10}},
+      grid:{left:32,right:8,top:6,bottom:24},
+      xAxis:{type:'category',data:labels,axisLabel:{...baseTextStyle},axisLine,splitLine:{show:false}},
+      yAxis:{type:'value',axisLabel:baseTextStyle,axisLine,splitLine,min:'dataMin'},
+      series:[{type:'line',smooth:true,symbol:'none',lineStyle:{width:2,color:'#00d4ff'},
+               areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#00d4ff33'},{offset:1,color:'#00d4ff00'}]}},
+               data:d.temp}]
+    });
+
+    if(!co2Chart) co2Chart=echarts.init(document.getElementById('co2-chart'));
+    co2Chart.setOption({backgroundColor:'transparent',animation:false,
+      grid:{left:36,right:6,top:4,bottom:18},
+      xAxis:{type:'category',data:labels,axisLabel:{...baseTextStyle,show:false},axisLine,splitLine:{show:false}},
+      yAxis:{type:'value',axisLabel:baseTextStyle,axisLine,splitLine},
+      series:[{type:'line',smooth:true,symbol:'none',lineStyle:{width:1.5,color:'#ff9500'},
+               areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#ff950033'},{offset:1,color:'#ff950000'}]}},
+               data:d.co2}]
+    });
+
+    if(!humChart) humChart=echarts.init(document.getElementById('hum-chart'));
+    humChart.setOption({backgroundColor:'transparent',animation:false,
+      grid:{left:36,right:6,top:4,bottom:18},
+      xAxis:{type:'category',data:labels,axisLabel:{...baseTextStyle,show:false},axisLine,splitLine:{show:false}},
+      yAxis:{type:'value',axisLabel:baseTextStyle,axisLine,splitLine,min:30,max:90},
+      series:[{type:'line',smooth:true,symbol:'none',lineStyle:{width:1.5,color:'#00ff88'},
+               areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#00ff8833'},{offset:1,color:'#00ff8800'}]}},
+               data:d.humidity}]
+    });
+  }).catch(()=>{});
+}
+
+function buildRoomLinks(rooms){
+  document.getElementById('room-links').innerHTML=rooms.map(rm=>`
+    <a href="/classroom/${curFloor}/${rm.id}" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--cyan);text-decoration:none;font-size:11px;font-weight:700">
+      <span>${rm.id}</span><span style="color:var(--text3)">→</span>
+    </a>
+  `).join('');
+}
+
+function init(){
+  const rooms=curFloor==='GF'?GF_ROOMS:LF_ROOMS;
+  const cW=curFloor==='GF'?GF_W:LIB_W;
+  const cH=curFloor==='GF'?GF_H:LIB_H;
+  document.getElementById('tab-gf').className='floor-tab'+(curFloor==='GF'?' active':'');
+  document.getElementById('tab-1f').className='floor-tab'+(curFloor==='1F'?' active':'');
+  document.getElementById('center-title').textContent=curFloor==='GF'?'GROUND FLOOR — PLAN VIEW':'FIRST FLOOR — LIBRARY PLAN';
+
+  buildTiles(rooms, cW, cH);
+  buildRoomLinks(rooms);
+  loadFeedback();
+  loadCharts(rooms[0].id);
+
+  fetch('/api/current').then(r=>r.json()).then(d=>renderFloor(d)).catch(()=>{});
+}
+
+init();
+setInterval(()=>{ fetch('/api/current').then(r=>r.json()).then(d=>renderFloor(d)).catch(()=>{}); loadFeedback(); }, 15000);
+</script>
+</body></html>

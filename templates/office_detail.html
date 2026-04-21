@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Office Detail — SCADA</title>
+<link rel="stylesheet" href="/static/css/scada.css">
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+  body { overflow:hidden; }
+  .layout { display:grid; grid-template-columns:1fr 280px; height:100%; }
+  .main-col { display:grid; grid-template-rows:1fr 200px; }
+  .scene-area { position:relative; overflow:hidden; background:radial-gradient(ellipse at 40% 40%,#08122a 0%,#04080f 80%); }
+  .info-bar { border-top:1px solid var(--border); background:var(--bg1); display:grid; grid-template-columns:repeat(5,1fr); gap:0; }
+  .info-cell { padding:14px 16px; border-right:1px solid var(--border2); display:flex; flex-direction:column; gap:4px; }
+  .info-cell:last-child { border-right:none; }
+  .right-panel { background:var(--bg1); border-left:1px solid var(--border); overflow-y:auto; padding:14px 12px; display:flex; flex-direction:column; gap:10px; }
+  #office-canvas { display:block; position:absolute; top:0; left:0; }
+
+  /* Desk grid overlay */
+  #desk-overlay {
+    position:absolute; inset:0; pointer-events:none; z-index:5;
+  }
+  .desk-pip {
+    position:absolute; width:14px; height:10px; border-radius:2px;
+    border:1px solid rgba(0,200,255,0.4); background:rgba(0,50,80,0.5);
+    transition:0.3s;
+  }
+  .desk-pip.occupied { border-color:rgba(0,255,136,0.6); background:rgba(0,80,40,0.5); }
+  .desk-pip.feedback-hot  { border-color:rgba(255,59,48,0.8); background:rgba(100,15,10,0.7); }
+  .desk-pip.feedback-cold { border-color:rgba(0,150,255,0.8); background:rgba(0,30,80,0.7); }
+  .desk-pip.feedback-ok   { border-color:rgba(0,255,136,0.8); background:rgba(0,60,30,0.7); }
+
+  /* Feedback bubbles */
+  .feedback-bubble {
+    position:absolute; border-radius:12px; padding:4px 9px;
+    font-size:10px; font-weight:700; pointer-events:none; z-index:8;
+    animation:bubble-rise 3.5s ease-out forwards;
+  }
+  @keyframes bubble-rise {
+    0%   { opacity:1; transform:translateY(0) scale(1); }
+    80%  { opacity:0.8; }
+    100% { opacity:0; transform:translateY(-60px) scale(0.6); }
+  }
+  .bubble-hot  { background:rgba(255,59,48,0.85); color:#fff; }
+  .bubble-warm { background:rgba(255,149,0,0.85);  color:#fff; }
+  .bubble-ok   { background:rgba(0,255,136,0.85);  color:#000; }
+  .bubble-cold { background:rgba(0,180,255,0.85);  color:#fff; }
+
+  /* FCU status indicator on scene */
+  .fcu-indicator {
+    position:absolute; top:12px;
+    background:rgba(8,15,28,0.85); border:1px solid var(--border);
+    border-radius:8px; padding:8px 12px; font-size:11px;
+    backdrop-filter:blur(8px); z-index:6;
+  }
+  .fcu-indicator.left  { left:12px; }
+  .fcu-indicator.right { right:12px; }
+
+  /* Score history */
+  .score-item {
+    display:flex; align-items:center; gap:8px;
+    padding:5px 8px; border-radius:6px;
+    background:var(--bg3); border:1px solid var(--border2);
+  }
+  .score-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav class="topnav">
+  <a class="topnav-brand" href="/"><div class="logo-dot"></div><span>IntelliSCADA</span></a>
+  <div class="topnav-links">
+    <a href="/">Overview</a>
+    <a href="/chiller-plant">Chiller Plant</a>
+    <a href="/energy-dashboard">Energy</a>
+    <a id="nav-floor-link" href="#">Floor —</a>
+    <a href="#" class="active" id="nav-office-label">Office —</a>
+  </div>
+  <div class="topnav-right">
+    <div class="status-indicator"><div class="status-dot"></div>LIVE</div>
+    <div class="topnav-clock" id="nav-clock">--:--:--</div>
+  </div>
+</nav>
+
+<div class="main-content">
+<div class="layout">
+
+  <!-- Left/main column -->
+  <div class="main-col">
+
+    <!-- 3D Office Scene -->
+    <div class="scene-area" id="scene-area">
+      <canvas id="office-canvas"></canvas>
+      <div id="desk-overlay"></div>
+
+      <!-- FCU status top-left -->
+      <div class="fcu-indicator left" id="fcu-l">
+        <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:4px">FCU-01</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div id="fcu1-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)"></div>
+          <span style="font-size:12px;font-weight:700;color:var(--cyan)" id="fcu1-valve">— %</span>
+          <span style="font-size:10px;color:var(--text2)">valve</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">
+          Supply: <span id="fcu1-supply" style="color:var(--cyan)">—°C</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2)">
+          CHWS: <span id="fcu1-chws" style="color:#0099cc">—°C</span>
+          / <span id="fcu1-chwr" style="color:#3366aa">—°C</span>
+        </div>
+      </div>
+
+      <!-- Room temp top-right -->
+      <div class="fcu-indicator right" id="temp-indicator">
+        <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:2px">ZONE TEMP</div>
+        <div style="font-size:28px;font-weight:700;color:var(--cyan)" id="zone-temp-big">—°C</div>
+        <div style="font-size:10px;color:var(--text2)">
+          RH: <span id="zone-hum" style="color:var(--text1)">— %</span>
+          &nbsp; CO₂: <span id="zone-co2" style="color:var(--orange)">— ppm</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info bar -->
+    <div class="info-bar">
+      <div class="info-cell">
+        <div class="kpi-label">Zone Temp</div>
+        <div style="font-size:22px;font-weight:700;color:var(--cyan)" id="info-temp">—°C</div>
+      </div>
+      <div class="info-cell">
+        <div class="kpi-label">FCU Valve Open</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green)" id="info-fcu">— %</div>
+        <div class="progress-bar"><div class="progress-fill green" id="bar-fcu" style="width:0%"></div></div>
+      </div>
+      <div class="info-cell">
+        <div class="kpi-label">CHW Supply / Return</div>
+        <div style="font-size:16px;font-weight:700">
+          <span style="color:#0099cc" id="info-chws">—°C</span>
+          <span style="color:var(--text3)"> / </span>
+          <span style="color:#5588cc" id="info-chwr">—°C</span>
+        </div>
+      </div>
+      <div class="info-cell">
+        <div class="kpi-label">Occupancy</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green)" id="info-occ">— %</div>
+      </div>
+      <div class="info-cell">
+        <div class="kpi-label">CO₂ Level</div>
+        <div style="font-size:22px;font-weight:700;color:var(--orange)" id="info-co2">— ppm</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="panel-title">■ FEEDBACK HISTORY</div>
+    <div id="feedback-history" style="display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto"></div>
+
+    <div class="panel-title mt-8">■ COMFORT DISTRIBUTION</div>
+    <div id="comfort-pie" style="height:160px"></div>
+
+    <div class="panel-title mt-4">■ TEMP TREND (24H)</div>
+    <div id="temp-trend" style="height:120px"></div>
+
+    <div class="panel-title mt-4">■ WATER TEMPS (24H)</div>
+    <div id="water-trend" style="height:120px"></div>
+
+    <div class="panel-title mt-4">■ QUICK NAV</div>
+    <div id="quick-nav" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const FLOOR_ID  = parseInt("{{ floor_id }}") || 1;
+const OFFICE_ID = "{{ office_id }}" || "A";
+const OFFICE_IDX = {A:0,B:1,C:2,D:3}[OFFICE_ID];
+const N_DESKS   = [12,16,20,12][OFFICE_IDX];
+
+function updateClock(){ document.getElementById('nav-clock').textContent=new Date().toTimeString().slice(0,8); }
+setInterval(updateClock,1000); updateClock();
+
+document.getElementById('nav-floor-link').href = `/floor-plan/${FLOOR_ID}`;
+document.getElementById('nav-floor-link').textContent = `Floor ${FLOOR_ID}`;
+document.getElementById('nav-office-label').textContent = `Office ${OFFICE_ID}`;
+
+// Quick nav
+const qnav = document.getElementById('quick-nav');
+qnav.innerHTML = `
+  <a href="/floor-plan/${FLOOR_ID}" style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--cyan);text-decoration:none;font-size:11px">← Floor ${FLOOR_ID} Plan</a>
+` + ['A','B','C','D'].filter(o=>o!==OFFICE_ID).map(o=>`
+  <a href="/office-detail/${FLOOR_ID}/${o}" style="padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text2);text-decoration:none;font-size:11px">Office ${o}</a>
+`).join('');
+
+// ── Three.js office scene ────────────────────────────────────────────────────
+const canvas = document.getElementById('office-canvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.4;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc8e8f4);
+scene.fog = new THREE.Fog(0xc8e8f4, 25, 60);
+
+const camera = new THREE.PerspectiveCamera(50,1,0.1,200);
+camera.position.set(0, 12, 18);
+camera.lookAt(0, 1, 0);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI/2.05;
+controls.minDistance = 6;
+controls.maxDistance = 30;
+controls.target.set(0,1,0);
+
+// Lights — bright daytime office
+scene.add(new THREE.AmbientLight(0xfff8f0, 1.8));
+// Sunlight streaming in from windows
+const sunIn = new THREE.DirectionalLight(0xfff5e0, 2.0);
+sunIn.position.set(8, 10, 10);
+sunIn.castShadow = true;
+sunIn.shadow.mapSize.set(1024,1024);
+scene.add(sunIn);
+// Warm ceiling fill
+const ceiling = new THREE.PointLight(0xfff0d8, 1.0, 40);
+ceiling.position.set(0, 4.8, 0);
+scene.add(ceiling);
+// Cool sky fill from window side
+const skyFill = new THREE.DirectionalLight(0xc8e8ff, 0.6);
+skyFill.position.set(-5, 3, 8);
+scene.add(skyFill);
+
+// Floor — warm parquet wood
+const floorGeo = new THREE.PlaneGeometry(20, 14);
+const floorMat = new THREE.MeshStandardMaterial({color:0xc8a870, roughness:0.75, metalness:0.02});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Floor plank lines
+const plankMat = new THREE.MeshBasicMaterial({color:0xb8985e, transparent:true, opacity:0.35});
+for(let z=-6.5;z<=6.5;z+=1.4){
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(20,0.04), plankMat);
+  pl.rotation.x=-Math.PI/2; pl.position.set(0,0.01,z); scene.add(pl);
+}
+
+// Walls — light warm white (cream)
+const wallSolidMat = new THREE.MeshStandardMaterial({color:0xf0ece4, roughness:0.85, metalness:0.0});
+// Back wall (solid, no windows)
+const backWall = new THREE.Mesh(new THREE.BoxGeometry(20,5,0.2), wallSolidMat);
+backWall.position.set(0,2.5,-7); backWall.castShadow=true; scene.add(backWall);
+// Side walls (solid)
+[-10,10].forEach(x=>{
+  const sw = new THREE.Mesh(new THREE.BoxGeometry(0.2,5,14), wallSolidMat.clone());
+  sw.position.set(x,2.5,0); sw.castShadow=true; scene.add(sw);
+});
+
+// Front wall — window frames only (glass panels)
+// Frame strips
+const frameMat = new THREE.MeshStandardMaterial({color:0xe8e0d0, roughness:0.7});
+const glassMat = new THREE.MeshStandardMaterial({
+  color:0x88c8e8, roughness:0.0, metalness:0.1,
+  transparent:true, opacity:0.25, side:THREE.DoubleSide,
+});
+// Horizontal sill & header
+[[0,0.4,7,20,0.25,0.15],[0,4.8,7,20,0.25,0.15],[0,2.5,7,20,0.1,0.15]].forEach(([x,y,z,w,h,d])=>{
+  const f = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), frameMat);
+  f.position.set(x,y,z); scene.add(f);
+});
+// Vertical mullions every 3m
+for(let x=-9;x<=9;x+=3){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.12,5,0.15), frameMat.clone());
+  m.position.set(x,2.5,7); scene.add(m);
+}
+// Glass panels
+for(let i=0;i<6;i++){
+  const gx = -7.5 + i*3;
+  const g = new THREE.Mesh(new THREE.BoxGeometry(2.88,4.3,0.06), glassMat.clone());
+  g.position.set(gx,2.5,7); scene.add(g);
+}
+// Outside sky plane (seen through glass)
+const skyPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(60,30),
+  new THREE.MeshBasicMaterial({color:0x87cef0, side:THREE.DoubleSide})
+);
+skyPlane.position.set(0,8,18); scene.add(skyPlane);
+// Outside ground plane
+const outGround = new THREE.Mesh(
+  new THREE.PlaneGeometry(60,20),
+  new THREE.MeshBasicMaterial({color:0x6aaa50})
+);
+outGround.rotation.x=-Math.PI/2; outGround.position.set(0,-0.4,15); scene.add(outGround);
+
+// Ceiling — white acoustic tiles
+const ceilGeo = new THREE.PlaneGeometry(20,14);
+const ceilMat = new THREE.MeshStandardMaterial({color:0xf5f3ee, roughness:1, side:THREE.BackSide});
+const ceil = new THREE.Mesh(ceilGeo, ceilMat);
+ceil.rotation.x = Math.PI/2;
+ceil.position.y = 5;
+scene.add(ceil);
+
+// Ceiling lights (LED panels)
+for(let i=-6;i<=6;i+=4){
+  const lg = new THREE.BoxGeometry(1.8, 0.05, 0.6);
+  const lm = new THREE.MeshStandardMaterial({color:0xffffff, emissive:0xfff8f0, emissiveIntensity:1.0});
+  const l = new THREE.Mesh(lg, lm);
+  l.position.set(i, 4.97, 0);
+  scene.add(l);
+  // Light pool below
+  const lp = new THREE.PointLight(0xfff5e8, 0.5, 8);
+  lp.position.set(i, 4.8, 0);
+  scene.add(lp);
+}
+
+// Desks — arranged in rows
+const deskMeshes = [];
+const DESK_W=1.6, DESK_D=0.8, DESK_H=0.75;
+const rows = Math.ceil(N_DESKS/4);
+const cols = Math.min(N_DESKS, 4);
+for(let r=0;r<rows;r++){
+  for(let c=0;c<cols;c++){
+    const idx = r*cols+c;
+    if(idx>=N_DESKS) break;
+    const x = (c-(cols-1)/2)*2.8;
+    const z = (r-(rows-1)/2)*2.2;
+    // Desk surface
+    const dg = new THREE.BoxGeometry(DESK_W, 0.06, DESK_D);
+    const dm = new THREE.MeshStandardMaterial({color:0xd4c4a0, roughness:0.5, metalness:0.05});
+    const desk = new THREE.Mesh(dg, dm);
+    desk.position.set(x, DESK_H, z);
+    desk.castShadow = true;
+    desk.userData.deskIdx = idx+1;
+    // Desk legs
+    const legG = new THREE.BoxGeometry(0.06, DESK_H, 0.06);
+    const legM = new THREE.MeshStandardMaterial({color:0x888880, metalness:0.7, roughness:0.3});
+    [[-0.7,-0.35],[-0.7,0.35],[0.7,-0.35],[0.7,0.35]].forEach(([lx,lz])=>{
+      const leg = new THREE.Mesh(legG, legM);
+      leg.position.set(x+lx, DESK_H/2, z+lz);
+      scene.add(leg);
+    });
+    // Monitor
+    const monG = new THREE.BoxGeometry(0.7, 0.45, 0.04);
+    const monM = new THREE.MeshStandardMaterial({color:0x0a1020, emissive:0x001133, emissiveIntensity:0.4, metalness:0.7});
+    const mon = new THREE.Mesh(monG, monM);
+    mon.position.set(x, DESK_H+0.3, z-0.28);
+    scene.add(mon);
+    // Monitor glow (screen)
+    const scrG = new THREE.PlaneGeometry(0.62, 0.38);
+    const scrM = new THREE.MeshStandardMaterial({color:0x0d2444, emissive:0x0d2444, emissiveIntensity:0.6, transparent:true, opacity:0.9});
+    const scr = new THREE.Mesh(scrG, scrM);
+    scr.position.set(x, DESK_H+0.3, z-0.26);
+    scene.add(scr);
+
+    scene.add(desk);
+    deskMeshes.push(desk);
+  }
+}
+
+// FCU unit on wall
+const fcuG = new THREE.BoxGeometry(4, 0.5, 0.3);
+const fcuM = new THREE.MeshStandardMaterial({color:0x1a3050, emissive:0x0044aa, emissiveIntensity:0.2, metalness:0.7, roughness:0.3});
+const fcu = new THREE.Mesh(fcuG, fcuM);
+fcu.position.set(-2, 4.6, -6.7);
+scene.add(fcu);
+// FCU status light
+const fcuLight = new THREE.PointLight(0x0099ff, 0.4, 8);
+fcuLight.position.set(-2, 4.3, -6.0);
+scene.add(fcuLight);
+
+// People (simple cylinders)
+const personMeshes = [];
+for(let i=0;i<N_DESKS;i++){
+  const bodyG = new THREE.CylinderGeometry(0.18, 0.18, 0.9, 8);
+  const headG = new THREE.SphereGeometry(0.18, 8, 8);
+  const bodyColors=[0x3a5a8c,0x8c3a3a,0x3a8c5a,0x8c7a3a,0x6a3a8c,0x3a6a8c];
+  const pMat = new THREE.MeshStandardMaterial({color:bodyColors[i%bodyColors.length], roughness:0.8});
+  const body = new THREE.Mesh(bodyG, pMat);
+  const head = new THREE.Mesh(headG, new THREE.MeshStandardMaterial({color:0x3a5080, roughness:0.8}));
+  const desk = deskMeshes[i];
+  body.position.set(desk.position.x, desk.position.y+0.7, desk.position.z+0.7);
+  head.position.set(desk.position.x, desk.position.y+1.25, desk.position.z+0.7);
+  body.visible=false; head.visible=false;
+  scene.add(body); scene.add(head);
+  personMeshes.push({body,head});
+}
+
+// Resize — use window dimensions directly (avoids grid layout timing issues)
+function onResize(){
+  const w = window.innerWidth - 280;
+  const h = window.innerHeight - 52 - 200;
+  renderer.setSize(w, h, false);
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// Animate
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  const t=Date.now()*0.001;
+  fcuLight.intensity = 0.3+0.15*Math.sin(t*2);
+  skyFill.intensity  = 0.5+0.1*Math.sin(t*0.7);
+  renderer.render(scene,camera);
+}
+animate();
+
+// ── Data update ──────────────────────────────────────────────────────────────
+const scoreLabel=['','🥶 Very Cold','❄️ Cold','😊 OK','🌡️ Warm','🔥 Hot'];
+const scoreBadge=['','badge-cyan','badge-cyan','badge-green','badge-orange','badge-red'];
+const scoreColor=['','#0099ff','#0099ff','#00ff88','#ff9500','#ff3b30'];
+const scoreDeskClass=['','feedback-cold','feedback-cold','feedback-ok','feedback-hot','feedback-hot'];
+
+function updateOffice() {
+  fetch(`/api/office/${FLOOR_ID}/${OFFICE_ID}/status`).then(r=>r.json()).then(d=>{
+    document.getElementById('zone-temp-big').textContent = d.temp.toFixed(1)+'°C';
+    document.getElementById('zone-hum').textContent      = d.humidity.toFixed(0)+' %';
+    document.getElementById('zone-co2').textContent      = d.co2_ppm.toFixed(0)+' ppm';
+    document.getElementById('fcu1-valve').textContent    = d.fcu_valve.toFixed(0)+' %';
+    document.getElementById('fcu1-supply').textContent   = d.fcu_supply_temp.toFixed(2)+'°C';
+    document.getElementById('fcu1-chws').textContent     = d.chws_temp.toFixed(2)+'°C';
+    document.getElementById('fcu1-chwr').textContent     = d.chwr_temp.toFixed(2)+'°C';
+
+    document.getElementById('info-temp').textContent  = d.temp.toFixed(2)+'°C';
+    document.getElementById('info-fcu').textContent   = d.fcu_valve.toFixed(0)+' %';
+    document.getElementById('bar-fcu').style.width    = d.fcu_valve+'%';
+    document.getElementById('info-chws').textContent  = d.chws_temp.toFixed(2)+'°C';
+    document.getElementById('info-chwr').textContent  = d.chwr_temp.toFixed(2)+'°C';
+    document.getElementById('info-occ').textContent   = (d.occupancy*100).toFixed(0)+' %';
+    document.getElementById('info-co2').textContent   = d.co2_ppm.toFixed(0)+' ppm';
+
+    // Show/hide people
+    const occ = d.occupancy;
+    personMeshes.forEach((p,i)=>{
+      const show = Math.random() < occ;
+      p.body.visible = show;
+      p.head.visible = show;
+    });
+
+    // Recent feedback on right panel
+    const recent = d.recent_feedback || [];
+    document.getElementById('feedback-history').innerHTML = recent.slice(-20).reverse().map(e=>`
+      <div class="score-item">
+        <div class="score-dot" style="background:${scoreColor[e.score]}"></div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text3)">${e.ts.slice(5,16).replace('T',' ')} · Desk ${e.desk}</div>
+          <div style="font-size:11px;font-weight:700;color:${scoreColor[e.score]}">${scoreLabel[e.score]}</div>
+        </div>
+        <span class="badge ${scoreBadge[e.score]}">${e.temp.toFixed(1)}°C</span>
+      </div>
+    `).join('');
+
+    // Animate bubbles for last event if new
+    if(recent.length>0){
+      const last = recent[recent.length-1];
+      spawnBubble(last.score, last.desk);
+    }
+
+    // Comfort pie
+    if(recent.length>0) updatePie(recent);
+  });
+}
+
+function spawnBubble(score, deskId) {
+  const area = document.getElementById('scene-area');
+  const labels = ['','Very Cold','Cold','Comfortable','Warm','Hot!'];
+  const classes = ['','bubble-cold','bubble-cold','bubble-ok','bubble-warm','bubble-hot'];
+  const bubble = document.createElement('div');
+  bubble.className = `feedback-bubble ${classes[score]}`;
+  bubble.textContent = scoreLabel[score];
+  bubble.style.left = (20 + Math.random()*60)+'%';
+  bubble.style.top  = (30 + Math.random()*40)+'%';
+  area.appendChild(bubble);
+  setTimeout(()=>bubble.remove(), 3500);
+}
+
+// Comfort distribution pie
+let pieChart = null;
+function updatePie(events) {
+  const counts = [0,0,0,0,0,0];
+  events.forEach(e=>counts[e.score]++);
+  if(!pieChart) pieChart = echarts.init(document.getElementById('comfort-pie'));
+  pieChart.setOption({
+    backgroundColor:'transparent', animation:true,
+    tooltip:{trigger:'item',backgroundColor:'rgba(8,15,30,0.9)',borderColor:'rgba(0,200,255,0.3)',textStyle:{color:'#e8f4fd',fontSize:11}},
+    legend:{show:false},
+    series:[{
+      type:'pie', radius:['45%','75%'], center:['50%','50%'],
+      itemStyle:{borderRadius:4, borderColor:'rgba(4,8,15,0.5)', borderWidth:2},
+      data:[
+        {value:counts[1]+counts[2], name:'Cold', itemStyle:{color:'#0099ff'}},
+        {value:counts[3],           name:'OK',   itemStyle:{color:'#00ff88'}},
+        {value:counts[4]+counts[5], name:'Hot',  itemStyle:{color:'#ff3b30'}},
+      ],
+      label:{color:'#7aafc8',fontSize:10},
+      emphasis:{scale:true,scaleSize:6},
+    }]
+  });
+}
+
+// Trends
+function loadTrends() {
+  const base={color:'#7aafc8',fontFamily:'monospace',fontSize:10};
+  const al={lineStyle:{color:'rgba(0,200,255,0.15)'}};
+  const sl={lineStyle:{color:'rgba(0,200,255,0.07)'}};
+
+  fetch(`/api/floor/${FLOOR_ID}/timeseries/24`).then(r=>r.json()).then(d=>{
+    const ls = d.ts.map(t=>t.slice(11,16));
+    const bias = (OFFICE_IDX-1.5)*0.3;
+    const temps = d.zone_temp.map(v=>v+bias);
+
+    const ttChart = echarts.init(document.getElementById('temp-trend'));
+    ttChart.setOption({
+      backgroundColor:'transparent', animation:false,
+      grid:{left:32,right:6,top:4,bottom:20},
+      tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',textStyle:{color:'#e8f4fd',fontSize:10}},
+      xAxis:{type:'category',data:ls,axisLabel:{...base,show:false},axisLine:al,splitLine:{show:false}},
+      yAxis:{type:'value',axisLabel:base,axisLine:al,splitLine:sl,min:'dataMin'},
+      series:[{type:'line',smooth:true,symbol:'none',lineStyle:{width:2,color:'#00d4ff'},
+               areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'#00d4ff33'},{offset:1,color:'#00d4ff00'}]}},
+               data:temps}]
+    });
+
+    const wChart = echarts.init(document.getElementById('water-trend'));
+    // Use first chiller data as proxy for this office's water temps
+    fetch('/api/chiller/1/timeseries/24').then(r=>r.json()).then(wd=>{
+      const wl = wd.ts.map(t=>t.slice(11,16));
+      wChart.setOption({
+        backgroundColor:'transparent', animation:false,
+        grid:{left:32,right:6,top:4,bottom:20},
+        tooltip:{trigger:'axis',backgroundColor:'rgba(8,15,30,0.9)',textStyle:{color:'#e8f4fd',fontSize:10}},
+        legend:{data:['Supply','Return'],bottom:0,textStyle:{color:'#7aafc8',fontSize:9},icon:'roundRect',itemWidth:12,itemHeight:2},
+        xAxis:{type:'category',data:wl,axisLabel:{...base,show:false},axisLine:al,splitLine:{show:false}},
+        yAxis:{type:'value',axisLabel:base,axisLine:al,splitLine:sl},
+        series:[
+          {name:'Supply',type:'line',smooth:true,symbol:'none',lineStyle:{width:1.5,color:'#0099cc'},data:wd.chws_temp},
+          {name:'Return',type:'line',smooth:true,symbol:'none',lineStyle:{width:1.5,color:'#3366aa'},data:wd.chwr_temp},
+        ]
+      });
+    });
+  });
+}
+
+updateOffice();
+loadTrends();
+setInterval(updateOffice, 8000);
+</script>
+</body>
+</html>

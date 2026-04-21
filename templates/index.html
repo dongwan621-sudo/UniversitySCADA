@@ -1,0 +1,358 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><title>Lingnan University — Digital Twin</title>
+<link rel="stylesheet" href="/static/css/scada.css">
+<style>
+body{overflow:hidden}
+#c3d{position:fixed;top:52px;left:0;right:0;bottom:0;display:block;z-index:1}
+.sidebar-left{position:fixed;top:52px;left:0;bottom:0;z-index:10;width:240px;padding:14px 12px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(90deg,rgba(4,8,15,0.95) 75%,transparent);overflow-y:auto}
+.sidebar-right{position:fixed;top:52px;right:0;bottom:88px;z-index:10;width:210px;padding:14px 12px;display:flex;flex-direction:column;gap:8px;background:linear-gradient(270deg,rgba(4,8,15,0.95) 75%,transparent);overflow-y:auto}
+.bottom-bar{position:fixed;bottom:0;left:240px;right:210px;z-index:10;height:88px;background:linear-gradient(0deg,rgba(4,8,15,0.96) 70%,transparent);display:flex;align-items:center;padding:0 16px;gap:10px}
+.room-card{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:.2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:3px}
+.room-card:hover{border-color:var(--cyan);background:var(--cyan-dim)}
+.room-card.active{border-color:rgba(0,255,136,0.5);background:rgba(0,255,136,0.08)}
+.room-id{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3)}
+.room-temp{font-size:16px;font-weight:700;color:var(--cyan)}
+.room-status{font-size:10px;color:var(--text2)}
+.floor-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:11px;font-family:monospace;letter-spacing:.5px;transition:.2s}
+.floor-btn.active,.floor-btn:hover{background:var(--cyan-dim);color:var(--cyan);border-color:var(--cyan)}
+.info-popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;width:300px;background:rgba(6,11,24,0.97);border:1px solid var(--border);border-radius:14px;padding:22px;backdrop-filter:blur(16px);display:none}
+.info-popup.show{display:block}
+.popup-close{position:absolute;top:10px;right:14px;background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer}
+.popup-close:hover{color:var(--cyan)}
+</style></head><body>
+<div class="grid-bg"></div>
+<nav class="topnav">
+  <a class="topnav-brand" href="/"><div class="logo-dot"></div><span>LU Digital Twin</span></a>
+  <div class="topnav-links">
+    <a href="/" class="active">Overview</a>
+    <a href="/hvac-building">Building HVAC</a>
+    <a href="/floor/GF">G/F Classrooms</a>
+    <a href="/floor/1F">1/F Library</a>
+  </div>
+  <div class="topnav-right">
+    <div class="status-indicator"><div class="status-dot"></div>LIVE</div>
+    <div class="topnav-clock" id="clk">--:--:--</div>
+  </div>
+</nav>
+
+<canvas id="c3d"></canvas>
+
+<!-- LEFT sidebar -->
+<div class="sidebar-left">
+  <div class="panel-title">■ PATRICK LEE BUILDING</div>
+  <div style="font-size:10px;color:var(--text3);line-height:1.6">李運強教學大樓<br>Lingnan University, Tuen Mun</div>
+  <div style="display:flex;gap:6px;margin-top:4px">
+    <button class="floor-btn active" id="btn-gf" onclick="setFloor('GF')">G/F</button>
+    <button class="floor-btn" id="btn-1f" onclick="setFloor('1F')">1/F</button>
+  </div>
+  <div class="panel-title mt-8">■ OUTDOOR</div>
+  <div class="panel" style="padding:10px">
+    <div class="stat-row"><span class="stat-label">Temperature</span><span class="stat-value cyan" id="tout">—°C</span></div>
+    <div class="stat-row"><span class="stat-label">Humidity</span><span class="stat-value" id="hout">— %</span></div>
+  </div>
+  <div class="panel-title mt-8">■ SIMULATION TIME</div>
+  <div class="panel" style="padding:10px;text-align:center">
+    <div style="font-size:20px;font-weight:700;color:var(--cyan)" id="simtime">—</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:2px" id="simdate">—</div>
+  </div>
+  <div class="panel-title mt-8">■ BUILDING COMFORT</div>
+  <div id="comfort-summary" style="display:flex;flex-direction:column;gap:4px"></div>
+</div>
+
+<!-- RIGHT sidebar: room list -->
+<div class="sidebar-right">
+  <div class="panel-title" id="floor-label">■ G/F ROOMS</div>
+  <div id="room-list" style="display:flex;flex-direction:column;gap:5px"></div>
+</div>
+
+<!-- BOTTOM: GF classroom quick cards -->
+<div class="bottom-bar">
+  <div style="font-size:10px;color:var(--text3);letter-spacing:1.5px;white-space:nowrap">CLASSROOMS</div>
+  <a class="room-card" id="card-MBG1" href="/classroom/GF/MBG1">
+    <div class="room-id">MBG1</div><div class="room-temp" id="t-MBG1">—°C</div><div class="room-status" id="s-MBG1">—</div>
+  </a>
+  <a class="room-card" id="card-MBG2" href="/classroom/GF/MBG2">
+    <div class="room-id">MBG2</div><div class="room-temp" id="t-MBG2">—°C</div><div class="room-status" id="s-MBG2">—</div>
+  </a>
+  <a class="room-card" id="card-MBG3" href="/classroom/GF/MBG3">
+    <div class="room-id">MBG3</div><div class="room-temp" id="t-MBG3">—°C</div><div class="room-status" id="s-MBG3">—</div>
+  </a>
+  <a class="room-card" id="card-MBG4" href="/classroom/GF/MBG4">
+    <div class="room-id">MBG4</div><div class="room-temp" id="t-MBG4">—°C</div><div class="room-status" id="s-MBG4">—</div>
+  </a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+setInterval(()=>{ document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8); },1000);
+
+// ── Data (runs independently of Three.js) ────────────────────────────────────
+let currentFloor = 'GF';
+let lastData = null;
+const scoreLabel=['','🥶 Very Cold','❄️ Cold','😊 OK','🌡️ Warm','🔥 Hot'];
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function setFloor(f){
+  currentFloor=f;
+  document.getElementById('btn-gf').className='floor-btn'+(f==='GF'?' active':'');
+  document.getElementById('btn-1f').className='floor-btn'+(f==='1F'?' active':'');
+  document.getElementById('floor-label').textContent = f==='GF' ? '■ G/F ROOMS' : '■ 1/F LIBRARY';
+  renderRoomList(lastData, f);
+}
+
+function updateData(){
+  fetch('/api/current').then(r=>r.json()).then(d=>{
+    lastData=d;
+    document.getElementById('tout').textContent=d.T_out.toFixed(1)+'°C';
+    document.getElementById('hout').textContent=d.humidity_out.toFixed(0)+' %';
+    const ts=new Date(d.ts);
+    document.getElementById('simtime').textContent=ts.toTimeString().slice(0,5);
+    document.getElementById('simdate').textContent=DAYS[ts.getDay()===0?6:ts.getDay()-1]+' '+ts.toDateString().slice(4,10);
+    ['MBG1','MBG2','MBG3','MBG4'].forEach(rid=>{
+      const r=d.rooms[rid]||{};
+      document.getElementById('t-'+rid).textContent=(r.temp||0).toFixed(1)+'°C';
+      document.getElementById('s-'+rid).textContent=r.ac_on?`AC ON · ${(r.ac_valve||0).toFixed(0)}% valve`:'AC OFF';
+      document.getElementById('card-'+rid).className='room-card'+(r.occupancy>.1?' active':'');
+    });
+    renderRoomList(d, currentFloor);
+    renderComfortSummary(d);
+  }).catch(()=>{});
+}
+
+function renderRoomList(d, floor){
+  if(!d) return;
+  const list = document.getElementById('room-list');
+  const rooms = Object.entries(d.rooms).filter(([rid])=>{ const fl=rid.startsWith('LIB')?'1F':'GF'; return fl===floor; });
+  list.innerHTML = rooms.map(([rid,r])=>`
+    <a href="/classroom/${floor}/${rid}" style="display:flex;flex-direction:column;gap:3px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;transition:.2s" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3)">${rid}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--cyan)">${(r.temp||0).toFixed(1)}°C</span>
+      </div>
+      <div style="font-size:10px;color:var(--text2)">${r.ac_on?'AC ON':'AC OFF'} · ${((r.occupancy||0)*100).toFixed(0)}% occ</div>
+      <div style="height:3px;background:var(--bg0);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--cyan);width:${(r.ac_valve||0)}%"></div></div>
+    </a>
+  `).join('');
+}
+
+function renderComfortSummary(d){
+  fetch('/api/feedback').then(r=>r.json()).then(events=>{
+    const recent=events.slice(-30); const counts=[0,0,0,0,0,0];
+    recent.forEach(e=>counts[e.score]++);
+    const hot=counts[4]+counts[5], cold=counts[1]+counts[2], ok=counts[3], total=hot+cold+ok||1;
+    document.getElementById('comfort-summary').innerHTML=`
+      <div class="stat-row"><span class="stat-label">😊 Comfortable</span><span class="stat-value green">${Math.round(ok/total*100)}%</span></div>
+      <div class="stat-row"><span class="stat-label">🔥 Too Warm</span><span class="stat-value red">${Math.round(hot/total*100)}%</span></div>
+      <div class="stat-row"><span class="stat-label">❄️ Too Cold</span><span class="stat-value cyan">${Math.round(cold/total*100)}%</span></div>
+    `;
+  }).catch(()=>{});
+}
+
+updateData();
+setInterval(updateData, 10000);
+
+// ── Three.js ─────────────────────────────────────────────────────────────────
+try {
+const canvas = document.getElementById('c3d');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.6;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc8e8f8);
+scene.fog = new THREE.Fog(0xe0f0ff, 200, 800);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 1200);
+camera.position.set(0, 45, 130);
+camera.lookAt(0, 12, 0);
+
+const ctrl = new THREE.OrbitControls(camera, renderer.domElement);
+ctrl.enableDamping = true; ctrl.dampingFactor = 0.07;
+ctrl.minDistance = 50; ctrl.maxDistance = 350;
+ctrl.maxPolarAngle = Math.PI/2.05;
+ctrl.target.set(0, 10, 0);
+
+// SKY
+const skyGeo = new THREE.SphereGeometry(700,32,16);
+const skyMat = new THREE.ShaderMaterial({ side:THREE.BackSide,
+  uniforms:{top:{value:new THREE.Color(0x1a70d8)},bot:{value:new THREE.Color(0xeaf6ff)}},
+  vertexShader:`varying vec3 vP; void main(){vP=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform vec3 top,bot; varying vec3 vP; void main(){float h=normalize(vP+100.).y;gl_FragColor=vec4(mix(bot,top,pow(max(h,0.),.5)),1.);}`
+});
+scene.add(new THREE.Mesh(skyGeo,skyMat));
+
+// SUN
+const SUN = new THREE.Vector3(180,260,-120);
+const sunM = new THREE.Mesh(new THREE.SphereGeometry(12,16,16),new THREE.MeshBasicMaterial({color:0xfffde4}));
+sunM.position.copy(SUN); scene.add(sunM);
+const haloM = new THREE.Mesh(new THREE.SphereGeometry(20,16,16),new THREE.MeshBasicMaterial({color:0xfff8c0,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false}));
+haloM.position.copy(SUN); scene.add(haloM);
+
+// LIGHTS
+scene.add(new THREE.AmbientLight(0xfff4e8,1.5));
+const sun = new THREE.DirectionalLight(0xfffae8,3.0);
+sun.position.copy(SUN); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=sun.shadow.camera.bottom=-120;
+sun.shadow.camera.right=sun.shadow.camera.top=120;
+scene.add(sun);
+const fillDir=new THREE.DirectionalLight(0xc8e8ff,.5); fillDir.position.set(-80,60,80); scene.add(fillDir);
+scene.add(new THREE.HemisphereLight(0x87ceeb,0x5aaa44,.4));
+
+// GROUND — grass + plaza
+const grassM = new THREE.Mesh(new THREE.PlaneGeometry(600,600),
+  new THREE.MeshStandardMaterial({color:0x68bb50,roughness:.85}));
+grassM.rotation.x=-Math.PI/2; grassM.position.y=-.5; grassM.receiveShadow=true; scene.add(grassM);
+
+// Plaza (concrete in front of building)
+const plazaM = new THREE.Mesh(new THREE.PlaneGeometry(100,55),
+  new THREE.MeshStandardMaterial({color:0xc8c0b0,roughness:.85}));
+plazaM.rotation.x=-Math.PI/2; plazaM.position.set(0,-.38,38); plazaM.receiveShadow=true; scene.add(plazaM);
+
+// Plaza tile grid lines
+const tileM = new THREE.MeshBasicMaterial({color:0xb0a898,transparent:true,opacity:.4});
+for(let x=-48;x<=48;x+=4){ const m=new THREE.Mesh(new THREE.PlaneGeometry(.08,55),tileM); m.rotation.x=-Math.PI/2; m.position.set(x,-.37,38); scene.add(m); }
+for(let z=12;z<=64;z+=4){ const m=new THREE.Mesh(new THREE.PlaneGeometry(100,.08),tileM); m.rotation.x=-Math.PI/2; m.position.set(0,-.37,z); scene.add(m); }
+
+// Road
+const roadM = new THREE.Mesh(new THREE.PlaneGeometry(300,12),
+  new THREE.MeshStandardMaterial({color:0x3a3a3a,roughness:.95}));
+roadM.rotation.x=-Math.PI/2; roadM.position.set(0,-.39,76); scene.add(roadM);
+
+// ── PATRICK LEE BUILDING — curved arc facade ─────────────────────────────────
+const BEIGE   = new THREE.MeshStandardMaterial({color:0xe0d4bc,roughness:.65,metalness:.05});
+const BAND    = new THREE.MeshStandardMaterial({color:0x6a5040,roughness:.65,metalness:.1});
+const GLASS   = new THREE.MeshStandardMaterial({color:0x70b8d8,roughness:.05,metalness:.75,transparent:true,opacity:.72});
+const WHITE   = new THREE.MeshStandardMaterial({color:0xe8e0d0,roughness:.8});
+
+const R = 52, ARC = Math.PI * 0.62, NP = 14, FH = 4.2, NF = 5;
+const building = new THREE.Group();
+
+for(let p=0;p<NP;p++){
+  const ang = -ARC/2 + (p/(NP-1))*ARC;
+  const px  = R*Math.sin(ang);
+  const pz  = -R*Math.cos(ang) + R - 2;
+  const ry  = -ang;
+  const pw  = (2*R*Math.sin(ARC/(NP-1)/2)) * 1.08;
+
+  for(let f=0;f<NF;f++){
+    // Wall panel
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(pw,FH-.4,.7), BEIGE.clone());
+    wall.position.set(px, f*FH+FH/2, pz); wall.rotation.y=ry; wall.castShadow=true; building.add(wall);
+    // Horizontal band at bottom of each floor
+    const band = new THREE.Mesh(new THREE.BoxGeometry(pw,.4,.75), BAND.clone());
+    band.position.set(px, f*FH+.1, pz); band.rotation.y=ry; building.add(band);
+    // Glass window (G/F has smaller windows due to colonnade)
+    if(f>0){
+      const wh=FH-1.4, ww=pw*.78;
+      const win = new THREE.Mesh(new THREE.BoxGeometry(ww,wh,.15), GLASS.clone());
+      win.position.set(px+Math.sin(ry)*.45, f*FH+FH/2+.15, pz+Math.cos(ry)*.45); win.rotation.y=ry; building.add(win);
+    }
+  }
+
+  // Colonnade pillars at G/F (only on front ~60% panels)
+  if(p>=2 && p<=NP-3){
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(.55,.65,FH*.8,10), WHITE.clone());
+    const offR = R+2.5;
+    pillar.position.set(offR*Math.sin(ang), FH*.4, -offR*Math.cos(ang)+R-2);
+    building.add(pillar);
+  }
+}
+
+// Colonnade beam (lintel)
+const lintelGeo = new THREE.BoxGeometry(2*R*Math.sin(ARC/2)*.85,.5,.6);
+const lintel = new THREE.Mesh(lintelGeo, BAND.clone());
+lintel.position.set(0, FH*.82, R-2+2.5); building.add(lintel);
+
+// Diamond decorative elements (facade feature from photo)
+[[-22,NF*.6*FH,0],[22,NF*.6*FH,0],[-22,NF*.25*FH,0],[22,NF*.25*FH,0]].forEach(([dx,dy])=>{
+  const ang = Math.asin(dx/R);
+  const dz  = -R*Math.cos(ang)+R-2;
+  const dmnd= new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,.4), BAND.clone());
+  dmnd.position.set(dx,dy,dz); dmnd.rotation.set(0,-ang,Math.PI/4); building.add(dmnd);
+});
+
+// University signage plane (center G/F, above entrance)
+const signGeo = new THREE.BoxGeometry(18,.6,.2);
+const signMat = new THREE.MeshStandardMaterial({color:0x3a2e1e,roughness:.7});
+const sign = new THREE.Mesh(signGeo, signMat);
+sign.position.set(0, FH*.95, R-2+2.6); building.add(sign);
+
+// LEFT WING TOWER
+const LW = new THREE.Group();
+const lwBody = new THREE.Mesh(new THREE.BoxGeometry(18,NF*FH,16), BEIGE.clone());
+lwBody.position.set(0, NF*FH/2, 0); lwBody.castShadow=true; LW.add(lwBody);
+for(let f=0;f<NF;f++){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(18,.4,16.2),BAND.clone()); b.position.set(0,f*FH+.1,0); LW.add(b);
+  [[8.5,0,0,.4,FH-.8,16],[- 8.5,0,0,.4,FH-.8,16]].forEach(([wx,wy,wz,ww,wh,wd])=>{
+    const w=new THREE.Mesh(new THREE.BoxGeometry(ww,wh,wd*.6),GLASS.clone()); w.position.set(wx,f*FH+FH/2+.2,0); LW.add(w);
+  });
+}
+LW.position.set(-(R*Math.sin(ARC/2)+10), 0, -(R*Math.cos(ARC/2)-R+2)+2);
+building.add(LW);
+
+// RIGHT WING TOWER (mirror)
+const RW = LW.clone();
+RW.position.set((R*Math.sin(ARC/2)+10), 0, -(R*Math.cos(ARC/2)-R+2)+2);
+building.add(RW);
+
+// ROOF — flat top slab
+const roof = new THREE.Mesh(new THREE.BoxGeometry(2*R*Math.sin(ARC/2)+24,.6,20), BEIGE.clone());
+roof.position.set(0, NF*FH+.3, -3); building.add(roof);
+
+scene.add(building);
+
+// ── TREES ────────────────────────────────────────────────────────────────────
+function tree(x,z,h=9,r=3.5){
+  const g=new THREE.Group();
+  const tm=new THREE.MeshStandardMaterial({color:0x5c3d1e,roughness:.9});
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.4,.6,h*.35,7),tm); trunk.position.set(0,h*.175,0); trunk.castShadow=true; g.add(trunk);
+  [[0,h*.52,0,r],[r*.28,h*.62,r*.18,r*.72],[-r*.22,h*.58,-r*.14,r*.78]].forEach(([fx,fy,fz,fr])=>{
+    const f=new THREE.Mesh(new THREE.SphereGeometry(fr,8,6),new THREE.MeshStandardMaterial({color:new THREE.Color(.12+Math.random()*.1,.42+Math.random()*.15,.1),roughness:.9}));
+    f.position.set(fx,fy,fz); f.castShadow=true; g.add(f);
+  });
+  g.position.set(x,-.5,z); return g;
+}
+[[-55,50],[-42,50],[-30,50],[-18,50],[18,50],[30,50],[42,50],[55,50],
+ [-55,65],[-42,65],[42,65],[55,65],
+ [-62,-5],[-62,15],[-62,30],[62,-5],[62,15],[62,30],
+ [-25,-15],[25,-15],[0,-20],[-15,-10],[15,-10]
+].forEach(([x,z])=>scene.add(tree(x,z,8+Math.random()*5,3+Math.random()*2)));
+
+// Hills in background
+[[0,-160,200,60,30],[60,-150,160,45,25],[-60,-150,160,45,28],
+ [120,-140,120,35,20],[-130,-140,100,38,22],[180,-130,80,25,15]].forEach(([x,z,w,h,d])=>{
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0x3d7a30,roughness:.95}));
+  m.position.set(x,h/2-1,z); scene.add(m);
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function onResize(){
+  const w=window.innerWidth, h=window.innerHeight-52;
+  renderer.setSize(w,h,false);
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',onResize);
+onResize();
+setTimeout(onResize,0);
+
+// ── Animate ───────────────────────────────────────────────────────────────────
+function animate(t){
+  requestAnimationFrame(animate); ctrl.update();
+  haloM.material.opacity = .12+.06*Math.sin(t*.0008);
+  renderer.render(scene,camera);
+}
+animate(0);
+} catch(e) {
+  console.error('Three.js init error:', e);
+  document.getElementById('c3d').style.background='#0a1628';
+  const msg=document.createElement('div');
+  msg.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6060;font-family:monospace;font-size:13px;z-index:100;text-align:center;pointer-events:none';
+  msg.textContent='3D Error: '+e.message;
+  document.body.appendChild(msg);
+}
+</script></body></html>

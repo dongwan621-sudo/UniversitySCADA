@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HVAC AI Decision Center - Final Delivery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: radial-gradient(circle at 50% 50%, #1a202c 0%, #0d1117 100%);
+        }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        #chiller3DContainer {
+            width: 100%; 
+            height: 240px; 
+            background-color: rgba(13, 17, 23, 0.6); 
+            border-radius: 0.75rem; overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .glass-panel {
+            background: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .kpi-card { 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            background: rgba(31, 41, 55, 0.6);
+            backdrop-filter: blur(8px);
+        }
+        
+        .glow-green { box-shadow: 0 0 15px rgba(34, 197, 94, 0.2), inset 0 0 10px rgba(34, 197, 94, 0.05); border-top: 2px solid rgba(34, 197, 94, 0.8); }
+        .glow-blue  { box-shadow: 0 0 15px rgba(59, 130, 246, 0.2), inset 0 0 10px rgba(59, 130, 246, 0.05); border-top: 2px solid rgba(59, 130, 246, 0.8); }
+        .glow-red   { box-shadow: 0 0 15px rgba(239, 68, 68, 0.3), inset 0 0 10px rgba(239, 68, 68, 0.1); border-top: 2px solid rgba(239, 68, 68, 0.8); }
+        .glow-purple { box-shadow: 0 0 25px rgba(168, 85, 247, 0.4), inset 0 0 15px rgba(168, 85, 247, 0.1); border-top: 2px solid rgba(168, 85, 247, 1); }
+        .glow-neutral { border-top: 2px solid rgba(156, 163, 175, 0.5); }
+
+        .sparkline {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 40px;
+            opacity: 0.3; pointer-events: none; fill: none; stroke-width: 2;
+        }
+
+        .toggle-dot { transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        .toggle-bg { transition: background-color 0.2s ease-in-out; }
+        .status-badge { font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); }
+        
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+        }
+        .ai-active-ring { animation: pulse-purple 2s infinite; }
+    </style>
+</head>
+
+<body class="text-gray-100 font-sans antialiased h-screen flex flex-col overflow-hidden">
+
+    <header class="glass-panel border-b-0 p-4 flex justify-between items-center shrink-0 z-30 shadow-2xl relative">
+        <div class="flex items-center gap-4">
+            <div class="p-2 bg-teal-500/20 rounded-lg border border-teal-500/30">
+                <svg class="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-100 tracking-wide drop-shadow-md">HVAC AI Decision Command Center</h1>
+                <p class="text-xs text-gray-400">Hong Kong Ops | <span class="text-teal-400 font-mono">2024.Nov.18 - Nov.24</span> | AI Digital Twin</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <button onclick="resetDemoMode()" class="bg-teal-700/70 hover:bg-teal-600/80 text-teal-100 text-xs font-semibold py-2 px-3 rounded-lg border border-teal-500/50 transition shadow-lg">
+                Demo Mode Reset
+            </button>
+            <div id="statusIndicator" class="flex items-center gap-2 bg-gray-900/50 py-1.5 px-4 rounded-full border border-gray-600/50 backdrop-blur-sm">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                <span class="text-xs text-gray-300 font-medium">Recording Simulation</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-hidden grid grid-cols-12 gap-0 relative">
+        
+        <aside class="col-span-3 glass-panel border-r-0 flex flex-col overflow-y-auto custom-scrollbar z-20">
+            
+            <div class="p-4 border-b border-gray-700/50 shrink-0">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider shadow-black drop-shadow-sm">Chiller Twin View</h2>
+                    <span class="text-xs px-2 py-0.5 bg-teal-900/50 border border-teal-700 rounded text-teal-400">Live Sync</span>
+                </div>
+                <div id="chiller3DContainer"></div>
+            </div>
+
+            <div class="p-4 border-b border-gray-700/50 shrink-0">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Simulation Console</h2>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+                    <button onclick="document.getElementById('csvFileInput').click()" class="bg-gray-700/50 hover:bg-gray-600/50 text-gray-200 text-xs py-2 px-3 rounded border border-gray-600">📂 Load CSV</button>
+                    <button onclick="downloadMockData()" class="bg-gray-700/50 hover:bg-gray-600/50 text-gray-200 text-xs py-2 px-3 rounded border border-gray-600">⬇️ Export Data</button>
+                </div>
+                <button onclick="processMockData()" class="w-full bg-indigo-900/50 hover:bg-indigo-800/50 text-indigo-200 text-xs py-2 rounded border border-indigo-700 transition">
+                    🔄 Reset Simulation
+                </button>
+            </div>
+
+            <div class="p-4 border-b border-gray-700/50 bg-purple-900/20 shrink-0 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-2 opacity-20"><svg class="w-16 h-16 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg></div>
+                <div class="flex justify-between items-center mb-2 relative z-10">
+                    <h2 class="text-sm font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        AI Pilot Control
+                    </h2>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="aiModeToggle" class="sr-only peer" onchange="toggleAIMode()">
+                        <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <p class="text-[10px] text-gray-400 relative z-10 leading-tight">
+                    Once activated, AI takes full control of Chiller strategy to optimize based on real-time load.
+                </p>
+            </div>
+
+            <div class="p-4 border-b border-gray-700/50 shrink-0">
+                 <button onclick="openLogModal()" class="w-full flex items-center justify-between bg-gray-800 hover:bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 transition group shadow-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="p-1.5 bg-green-900/50 rounded text-green-400 group-hover:text-white transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-xs font-bold text-gray-300">Update Logs & Carbon Table</div>
+                            <div class="text-[10px] text-gray-500">Click for detailed report</div>
+                        </div>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-500 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-6 relative flex-1 min-h-[200px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Manual Strategy Control</h2>
+                    <span id="strategyIdDisplay" class="font-mono text-xs bg-black/40 px-2 py-1 rounded text-yellow-400 border border-yellow-500/20">0000</span>
+                </div>
+                
+                <div class="relative rounded-lg overflow-hidden p-1">
+                    <div id="manualControlOverlay" class="hidden absolute inset-0 bg-gray-900/80 z-20 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-lg border border-purple-500/20 transition-all duration-300">
+                        <svg class="w-8 h-8 text-purple-400 mb-2 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <span class="text-xs font-bold text-purple-300 px-3 py-1">AI Control Active</span>
+                    </div>
+                    
+                    <div id="chillerControls" class="grid grid-cols-2 gap-x-4 gap-y-6">
+                        </div>
+                </div>
+                
+                <div class="h-10"></div>
+            </div>
+        </aside>
+
+        <main class="col-span-9 flex flex-col p-6 overflow-hidden relative z-10">
+            <div class="grid grid-cols-5 gap-4 mb-6">
+                <div id="card-actual" class="kpi-card p-4 rounded-xl shadow-lg flex flex-col justify-between glow-neutral">
+                    <div class="relative z-10">
+                        <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wide">Actual Load</p>
+                        <div class="flex items-baseline gap-1">
+                            <span id="kpi-actual" class="text-2xl font-bold text-yellow-400">--</span>
+                            <span class="text-xs text-gray-500">kW</span>
+                        </div>
+                    </div>
+                    <div id="status-actual" class="status-badge bg-gray-800/50 text-gray-500 self-start mt-2 relative z-10 backdrop-blur-md border border-gray-600/30">--</div>
+                    <svg id="spark-actual" class="sparkline" stroke="rgba(250, 204, 21, 0.5)"></svg>
+                </div>
+
+                <div id="card-predicted" class="kpi-card p-4 rounded-xl shadow-lg flex flex-col justify-between glow-neutral">
+                    <div class="relative z-10">
+                        <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wide">Pred. Load</p>
+                        <div class="flex items-baseline gap-1">
+                            <span id="kpi-predicted" class="text-2xl font-bold text-blue-400">--</span>
+                            <span class="text-xs text-gray-500">kW</span>
+                        </div>
+                    </div>
+                    <div id="status-predicted" class="status-badge bg-gray-800/50 text-gray-500 self-start mt-2 relative z-10 backdrop-blur-md border border-gray-600/30">--</div>
+                    <svg id="spark-predicted" class="sparkline" stroke="rgba(96, 165, 250, 0.5)"></svg>
+                </div>
+
+                <div id="card-optimized" class="kpi-card p-4 rounded-xl shadow-lg flex flex-col justify-between glow-neutral">
+                    <div class="relative z-10">
+                        <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wide">Opt. Load</p>
+                        <div class="flex items-baseline gap-1">
+                            <span id="kpi-optimized" class="text-2xl font-bold text-green-400">--</span>
+                            <span class="text-xs text-gray-500">kW</span>
+                        </div>
+                    </div>
+                    <div id="status-optimized" class="status-badge bg-gray-800/50 text-gray-500 self-start mt-2 relative z-10 backdrop-blur-md border border-gray-600/30">--</div>
+                    <svg id="spark-optimized" class="sparkline" stroke="rgba(34, 197, 94, 0.5)"></svg>
+                </div>
+
+                <div class="kpi-card p-4 rounded-xl shadow-lg flex flex-col justify-between border-t-4 border-gray-500 bg-gray-800/60 backdrop-blur-sm">
+                    <div>
+                        <p class="text-xs text-gray-400 font-medium mb-1 uppercase tracking-wide">OLS Ideal Baseline</p>
+                        <div class="flex items-baseline gap-1">
+                            <span id="kpi-ols-ideal" class="text-2xl font-bold text-gray-300">--</span>
+                            <span class="text-xs text-gray-500">kW</span>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-gray-400 mt-2 bg-black/20 p-1 rounded inline-block">Temp: <span id="kpi-temp" class="text-gray-200 font-bold">--</span> °C</div>
+                </div>
+
+                <div class="kpi-card p-4 rounded-xl shadow-lg flex flex-col justify-between border-t-4 border-teal-500 bg-gray-800/60 backdrop-blur-sm">
+                    <div>
+                        <p class="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wide">Cumulative Benefits</p>
+                        <div class="space-y-1">
+                            <div class="flex justify-between items-baseline">
+                                <span class="text-xs text-gray-500">Cooling Saved</span>
+                                <span class="text-sm font-bold text-teal-400"><span id="kpi-saving-total-kwh">--</span> <span class="text-[10px]">kWh</span></span>
+                            </div>
+                            <div class="flex justify-between items-baseline">
+                                <span class="text-xs text-gray-500">Energy Saved</span>
+                                <span class="text-sm font-bold text-blue-400"><span id="kpi-saving-total-elec">--</span> <span class="text-[10px]">kWh</span></span>
+                            </div>
+                            <div class="flex justify-between items-baseline">
+                                <span class="text-xs text-gray-500">Cost Saved</span>
+                                <span class="text-sm font-bold text-yellow-400">$<span id="kpi-saving-total-money">--</span></span>
+                            </div>
+                            <div class="flex justify-between items-baseline border-t border-gray-700 pt-1 mt-1">
+                                <span class="text-xs text-gray-400">CO2 Reduced</span>
+                                <span class="text-sm font-bold text-green-400"><span id="kpi-saving-total-co2">--</span> <span class="text-[10px]">kg</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 glass-panel rounded-xl shadow-2xl p-4 flex flex-col relative border border-gray-700/50">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-100 drop-shadow-md">Cooling Load Time-Series Simulation (History + Forecast)</h2>
+                        <div class="flex gap-4 text-xs mt-1">
+                            <div class="flex items-center gap-1"><span class="w-3 h-0.5 bg-yellow-400"></span><span class="text-gray-400">Actual Load (Baseline)</span></div>
+                            <div class="flex items-center gap-1"><span class="w-3 h-0.5 bg-green-500"></span><span class="text-gray-400">AI Optimized Trajectory</span></div>
+                            <div class="flex items-center gap-1"><span class="w-3 h-3 bg-green-900/30 border border-green-500/30 rounded-sm"></span><span class="text-gray-400">OLS Comfort Zone (±30%)</span></div>
+                            <div class="flex items-center gap-1 ml-2"><span class="w-3 h-0.5 bg-blue-400 border-dashed" style="border-top: 2px dashed rgb(96, 165, 250)"></span><span class="text-gray-400">Forecast Load</span></div>
+                        </div>
+                    </div>
+                    
+                    <button id="playPauseBtn" onclick="toggleAnimation()" class="flex items-center gap-2 bg-gray-700/80 hover:bg-gray-600/80 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition border border-gray-500/50 disabled:opacity-50 backdrop-blur-sm shadow-lg" disabled>
+                        <svg id="playIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.372-5.89a1.5 1.5 0 000-2.538L6.3 2.841z" /></svg>
+                        <svg id="pauseIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        <span id="playPauseText">Pause Demo</span>
+                    </button>
+                </div>
+                
+                <div class="flex-1 w-full relative">
+                    <canvas id="coolingLoadChart"></canvas>
+                    <div id="chartPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 z-10 backdrop-blur-sm rounded-lg">
+                        <div class="text-teal-500 mb-2">
+                            <svg class="w-12 h-12 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        </div>
+                        <p class="text-gray-300 font-medium">System Initializing</p>
+                        <p class="text-sm text-gray-500 mt-1">Loading AI Simulation Model...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </main>
+
+    <div id="messageBox" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gray-800/90 border border-gray-600 text-white px-6 py-3 rounded-lg shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 z-50 flex items-center gap-3 backdrop-blur-md"></div>
+
+    <div id="logModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay">
+        <div class="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-3/4 max-w-4xl h-3/4 flex flex-col relative overflow-hidden">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/50">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        AI Optimization Logs & ESG Report
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-1">Records chiller strategy changes and environmental benefits</p>
+                </div>
+                <button onclick="closeLogModal()" class="text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-4 p-4 bg-gray-800/80">
+                <div class="p-3 bg-teal-900/20 border border-teal-500/20 rounded-lg">
+                    <p class="text-xs text-teal-400 uppercase font-bold">Total Cooling Saved</p>
+                    <p class="text-2xl font-bold text-white mt-1"><span id="log-total-kwh">0</span> <span class="text-sm font-normal text-gray-400">kWh</span></p>
+                </div>
+                <div class="p-3 bg-blue-900/20 border border-blue-500/20 rounded-lg">
+                    <p class="text-xs text-blue-400 uppercase font-bold">Total Energy Saved</p>
+                    <p class="text-2xl font-bold text-white mt-1"><span id="log-total-elec">0</span> <span class="text-sm font-normal text-gray-400">kWh</span></p>
+                </div>
+                <div class="p-3 bg-yellow-900/20 border border-yellow-500/20 rounded-lg">
+                    <p class="text-xs text-yellow-400 uppercase font-bold">Total Cost Saved</p>
+                    <p class="text-2xl font-bold text-white mt-1">$<span id="log-total-money">0</span></p>
+                </div>
+                <div class="p-3 bg-green-900/20 border border-green-500/20 rounded-lg">
+                    <p class="text-xs text-green-400 uppercase font-bold">Total CO2 Reduced</p>
+                    <p class="text-2xl font-bold text-white mt-1"><span id="log-total-co2">0</span> <span class="text-sm font-normal text-gray-400">kg</span></p>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-700/50 text-gray-300 text-xs uppercase sticky top-0 backdrop-blur-md">
+                        <tr>
+                            <th class="p-3 rounded-tl-lg">Time</th>
+                            <th class="p-3">Event Type</th>
+                            <th class="p-3">Strategy Change</th>
+                            <th class="p-3">Cooling Saved</th>
+                            <th class="p-3">Energy Saved</th>
+                            <th class="p-3">Cost Saved ($)</th>
+                            <th class="p-3">CO2 Reduced (kg)</th>
+                            <th class="p-3 rounded-tr-lg">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logTableBody" class="text-sm text-gray-300 divide-y divide-gray-700">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIG Constants (Including Carbon Coefficients) ---
+        const CONFIG = {
+            CHILLERS: 4,
+            WINDOW_SIZE: 24,
+            LOOKAHEAD_HOURS: 12,
+            ANIMATION_SPEED: 1000, 
+            STEP_SIZE: 1,
+            COMFORT_TOLERANCE: 0.30, 
+            COST_PER_KWH: 1.2,      // HKD per Electrical kWh
+            CO2_PER_KWH: 0.5,       // kg CO2 per Electrical kWh
+            AVG_COP: 10.0            // Average COP for conversion
+        };
+
+        const CHILLER_PARAMS = {
+            1: { capacity: 6500, efficiency: 3.5, base: 350 }, // Old
+            2: { capacity: 6500, efficiency: 3.5, base: 350 }, // Old
+            3: { capacity: 6500, efficiency: 6.0, base: 100 }, // New
+            4: { capacity: 6500, efficiency: 6.0, base: 100 }, // New
+        };
+
+        const COLORS = {
+            ACTUAL: 'rgb(250, 204, 21)',    
+            OPTIMIZED: 'rgb(34, 197, 94)',  
+            PREDICTED: 'rgb(96, 165, 250)', 
+            CHILLER_ON_COLOR: new THREE.Color(0x22c55e), 
+            CHILLER_ON_EMISSIVE: new THREE.Color(0x00ff00), 
+            CHILLER_OFF_COLOR: new THREE.Color(0x111111), 
+            CHILLER_OFF_EMISSIVE: new THREE.Color(0x000000), 
+            COMFORT_BAND: 'rgba(34, 197, 94, 0.1)' 
+        };
+
+        // --- 2. Global State ---
+        let state = {
+            allDataMap: {},       
+            scenarioData: {},     
+            baselineStrategyMap: {}, 
+            timestamps: [],       
+            currentIndex: 0,
+            isPlaying: false,
+            intervalId: null,
+            chart: null,
+            userStrategy: "1111", 
+            userOperationHistory: {}, 
+            sparklineData: { actual: [], predicted: [], optimized: [] },
+            aiMode: false,
+            logs: [],
+            stats: { savedLoad: 0, savedElec: 0, savedMoney: 0, savedCo2: 0 }
+        };
+
+        // --- 3. 3D Scene ---
+        let scene, camera, renderer, meshes = [];
+        function init3D() {
+            const container = document.getElementById('chiller3DContainer');
+            scene = new THREE.Scene(); scene.background = null; 
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth/container.clientHeight, 0.1, 100);
+            camera.position.set(0, 7, 19); camera.lookAt(0, 0, 0); 
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; controls.autoRotate = false;
+            
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(5, 10, 5); scene.add(dl);
+            const pl = new THREE.PointLight(0xffffff, 0.3); pl.position.set(0, 5, 0); scene.add(pl);
+
+            const grid = new THREE.GridHelper(24, 24, 0x444444, 0x1a1a1a); scene.add(grid);
+
+            for(let i=0; i<CONFIG.CHILLERS; i++) {
+                const group = createChillerGroup(i);
+                group.position.set((i - 1.5) * 5, 0, 0); 
+                scene.add(group); 
+                meshes.push(group);
+            }
+
+            window.addEventListener('resize', () => { camera.aspect = container.clientWidth/container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); });
+            function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+            animate();
+        }
+
+        function createChillerGroup(index) {
+            const group = new THREE.Group();
+            const baseGeo = new THREE.BoxGeometry(2.5, 0.2, 4);
+            const baseMat = new THREE.MeshLambertMaterial({color: 0x1a202c});
+            const base = new THREE.Mesh(baseGeo, baseMat);
+            base.position.y = 0.1;
+            group.add(base);
+
+            const metalMat = new THREE.MeshPhongMaterial({ color: 0x666666, specular: 0x111111, shininess: 60 });
+            const darkMetalMat = new THREE.MeshPhongMaterial({ color: 0x444444, specular: 0x222222, shininess: 40 });
+
+            const evapGeo = new THREE.CylinderGeometry(0.7, 0.7, 3.2, 32);
+            const evap = new THREE.Mesh(evapGeo, metalMat);
+            evap.rotation.z = Math.PI/2;
+            evap.position.y = 0.9;
+            group.add(evap);
+
+            const condGeo = new THREE.CylinderGeometry(0.6, 0.6, 3.0, 32);
+            const cond = new THREE.Mesh(condGeo, metalMat);
+            cond.rotation.z = Math.PI/2;
+            cond.position.set(0, 2.0, -0.4);
+            group.add(cond);
+
+            const compGeo = new THREE.BoxGeometry(0.8, 0.8, 1.0);
+            const comp = new THREE.Mesh(compGeo, darkMetalMat);
+            comp.position.set(0, 2.8, 0);
+            group.add(comp);
+
+            const panelGeo = new THREE.BoxGeometry(0.2, 0.8, 0.5);
+            const panel = new THREE.Mesh(panelGeo, darkMetalMat);
+            panel.position.set(1.0, 1.2, 1.2);
+            group.add(panel);
+
+            const lightGeo = new THREE.SphereGeometry(0.35); 
+            const lightMat = new THREE.MeshPhongMaterial({ color: 0x111111, emissive: 0x000000, shininess: 100 }); 
+            const statusLight = new THREE.Mesh(lightGeo, lightMat);
+            statusLight.position.set(0, 3.6, 0);
+            statusLight.userData.isLight = true;
+            group.add(statusLight);
+
+            const cvs = document.createElement('canvas'); cvs.width=128; cvs.height=64; 
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 28px Arial'; ctx.textAlign='center'; ctx.fillText(`CH-${index+1}`, 64, 40);
+            const label = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(cvs)})); 
+            label.position.set(0, 4.5, 0); 
+            label.scale.set(3, 1.5, 1); 
+            group.add(label);
+
+            return group;
+        }
+
+        function update3DState(strategyStr) {
+            const states = strategyStr.split('').map(c => c === '1');
+            states.forEach((isOn, idx) => {
+                const group = meshes[idx];
+                const lightMesh = group.children.find(c => c.userData.isLight);
+                if (isOn) {
+                    lightMesh.material.color = COLORS.CHILLER_ON_COLOR;
+                    lightMesh.material.emissive = COLORS.CHILLER_ON_EMISSIVE; 
+                    lightMesh.material.emissiveIntensity = 1.0;
+                } else {
+                    lightMesh.material.color = COLORS.CHILLER_OFF_COLOR;
+                    lightMesh.material.emissive = COLORS.CHILLER_OFF_EMISSIVE;
+                    lightMesh.material.emissiveIntensity = 0;
+                }
+            });
+        }
+
+        // --- 4. Core Load Calculation ---
+        function calculateLoad(thermalDemand, strategyId) {
+            const chillers = strategyId.split('').map(c => c==='1');
+            let totalCap = 0;
+            let totalBase = 0;
+            let activeCount = 0;
+
+            chillers.forEach((isOn, i) => {
+                if(isOn) {
+                    const p = CHILLER_PARAMS[i+1];
+                    totalCap += p.capacity;
+                    totalBase += p.base;
+                    activeCount++;
+                }
+            });
+
+            if(activeCount === 0) return { actual: 0, predicted: 0 };
+
+            let currentEfficiency = 0;
+            chillers.forEach((isOn, i) => {
+                if(isOn) currentEfficiency += CHILLER_PARAMS[i+1].efficiency;
+            });
+            let avgCOP = currentEfficiency / activeCount;
+
+            let inefficiencyFactor = 1.0;
+            const plr = thermalDemand / totalCap; 
+            if (plr < 0.25) inefficiencyFactor = 1.5; 
+            else if (plr < 0.5) inefficiencyFactor = 1.2;
+
+            const processedThermal = Math.min(thermalDemand, totalCap * 1.1);
+            let elecLoad = totalBase + (processedThermal / avgCOP) * inefficiencyFactor;
+            
+            const predicted = elecLoad + (Math.random() > 0.5 ? 1 : -1) * (30 + Math.random()*70); 
+            return { actual: elecLoad, predicted: predicted };
+        }
+
+        // --- 5. Data Generation ---
+        function generateMockCSV() {
+            let csv = "Timestamp,Strategy_ID,Actual_Load,Predicted_Load,Is_Baseline,Temperature,Ideal_OLS_Load,Thermal_Demand\n";
+            const startDate = new Date('2024-11-18T00:00:00'); 
+            const tempProfile = [22, 25.0, 19.5, 17.8, 19.1, 19.6, 22];
+
+            state.scenarioData = {};
+
+            for(let h=0; h<168; h++) { 
+                const ts = new Date(startDate.getTime() + h*3600000);
+                const tsKey = ts.getTime();
+                state.scenarioData[tsKey] = {}; 
+
+                const tsStr = ts.toISOString();
+                const hour = ts.getHours();
+                const day = ts.getDay(); 
+                
+                const dayBaseTemp = tempProfile[day];
+                const tempCurve = Math.sin((hour-6)/24 * 2 * Math.PI - Math.PI/2); 
+                const temp = dayBaseTemp + tempCurve * 2.0 + (Math.random() - 0.5); 
+
+                const isWorkHour = (hour >= 9 && hour <= 17);
+                const isMorningSpike = (hour >= 9 && hour <= 10);
+                
+                let thermalDemand = 0;
+                let humanStrategy = '0001'; 
+                let targetIdealLoad = 300; 
+
+                if (day >= 1 && day <= 5 && isWorkHour) { 
+                    let targetActualLoad = 300; 
+                    if (day === 1) { 
+                        targetActualLoad = 3500;
+                        humanStrategy = '1111'; 
+                        targetIdealLoad = 3500; 
+                    } else if (day === 2) { 
+                        targetActualLoad = 3200;
+                        humanStrategy = '1111'; 
+                        targetIdealLoad = 2000; 
+                    } else if (day === 3) { 
+                        targetActualLoad = 3100;
+                        humanStrategy = '1111'; 
+                        targetIdealLoad = 2000;
+                    } else if (day === 4 || day === 5) { 
+                        targetActualLoad = 2000;
+                        humanStrategy = '0011'; 
+                        targetIdealLoad = 2000;
+                    }
+
+                    let optimalStrategy = '0011'; 
+                    if (day === 1) optimalStrategy = '1111'; 
+
+                    let optBase = 0, optCOP = 0, c = 0;
+                    optimalStrategy.split('').forEach((x,i)=>{ if(x==='1') { optBase+=CHILLER_PARAMS[i+1].base; optCOP+=CHILLER_PARAMS[i+1].efficiency; c++; }});
+                    optCOP /= c;
+
+                    thermalDemand = (targetIdealLoad - optBase) * optCOP;
+
+                    if (isMorningSpike) {
+                        thermalDemand += 1500; 
+                        targetIdealLoad += 250;
+                    }
+                } else {
+                    targetIdealLoad = 300;
+                    humanStrategy = '0001'; 
+                    thermalDemand = (300 - 100) * 6.0; 
+                }
+
+                thermalDemand += (Math.random() - 0.5) * 50; 
+                if (thermalDemand < 50) thermalDemand = 50;
+
+                for(let i=1; i<16; i++) {
+                    const sid = i.toString(2).padStart(4,'0');
+                    const sim = calculateLoad(thermalDemand, sid);
+                    state.scenarioData[tsKey][sid] = {
+                        actual: sim.actual,
+                        predicted: sim.predicted
+                    };
+                }
+
+                let actualElecLoad = state.scenarioData[tsKey][humanStrategy].actual;
+                let idealElecLoad = targetIdealLoad + (Math.random() - 0.5) * 20;
+
+                csv += `${tsStr},${humanStrategy},${actualElecLoad.toFixed(2)},${(actualElecLoad*1.02).toFixed(2)},1,${temp.toFixed(1)},${idealElecLoad.toFixed(1)},${thermalDemand.toFixed(1)}\n`;
+            }
+            return csv;
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            state.allDataMap = {};
+            state.baselineStrategyMap = {};
+            const tsSet = new Set();
+            for(let i=1; i<lines.length; i++) {
+                const cols = lines[i].split(',');
+                if(cols.length < 4) continue;
+                const dateObj = new Date(cols[0]);
+                const tsKey = dateObj.getTime();
+                if(isNaN(tsKey)) continue;
+                const sid = cols[1];
+                const act = parseFloat(cols[2]);
+                const pre = parseFloat(cols[3]);
+                const temp = parseFloat(cols[5]);
+                const ideal = parseFloat(cols[6]);
+                const thermal = parseFloat(cols[7]);
+                
+                if(!state.allDataMap[tsKey]) state.allDataMap[tsKey] = {};
+                state.allDataMap[tsKey][sid] = { actual: act, predicted: pre, temp: temp, idealOls: ideal, thermalDemand: thermal };
+                state.baselineStrategyMap[tsKey] = sid;
+                tsSet.add(tsKey); 
+            }
+            state.timestamps = Array.from(tsSet).sort((a,b) => a - b).map(t => new Date(t));
+        }
+
+        // --- 6. AI Logic ---
+
+        function toggleAIMode() {
+            state.aiMode = document.getElementById('aiModeToggle').checked;
+            const overlay = document.getElementById('manualControlOverlay');
+            if (state.aiMode) {
+                showMessage("AI Pilot Mode Activated - Full Auto Control", 'success');
+                overlay.classList.remove('hidden'); 
+                document.getElementById('card-optimized').classList.add('ai-active-ring');
+            } else {
+                showMessage("Switched to Manual Control Mode", 'success');
+                overlay.classList.add('hidden'); 
+                document.getElementById('card-optimized').classList.remove('ai-active-ring');
+            }
+        }
+
+        function triggerAIIntervention(tsKey, currentStrategy, idealLoad, thermalDemand) {
+            try {
+                let bestSid = currentStrategy;
+                let minDiff = Infinity;
+                
+                const strategies = state.scenarioData[tsKey];
+                if (!strategies) return;
+
+                for (const sid in strategies) {
+                    let totalCap = 0;
+                    sid.split('').forEach((c, idx) => { if(c==='1') totalCap += CHILLER_PARAMS[idx+1].capacity; });
+                    if (totalCap < thermalDemand * 0.98) continue; 
+
+                    const load = strategies[sid].actual;
+                    const diff = Math.abs(load - idealLoad);
+                    
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestSid = sid;
+                    }
+                }
+
+                if (bestSid !== currentStrategy) {
+                    state.userStrategy = bestSid;
+                    updateUserStrategyVisuals(); 
+                    update3DState(bestSid);
+
+                    const currentLoad = strategies[currentStrategy].actual;
+                    const newLoad = strategies[bestSid].actual;
+                    
+                    // --- MATH UPDATE ---
+                    const savedCoolingLoad = Math.max(0, currentLoad - newLoad); // Chart Delta
+                    const savedElec = savedCoolingLoad / CONFIG.AVG_COP;
+                    const money = savedElec * CONFIG.COST_PER_KWH;
+                    const co2 = savedElec * CONFIG.CO2_PER_KWH;
+
+                    const logEntry = {
+                        time: new Date(tsKey),
+                        type: 'AI Auto-Optimization',
+                        old: currentStrategy,
+                        new: bestSid,
+                        savedCooling: savedCoolingLoad,
+                        savedElec: savedElec,
+                        money: money,
+                        co2: co2
+                    };
+                    state.logs.unshift(logEntry); 
+                    if(state.logs.length > 50) state.logs.pop(); 
+                    
+                    showMessage(`AI Intervention: ${currentStrategy} -> ${bestSid}`, 'success');
+                }
+            } catch (e) {
+                console.error("AI Logic Error:", e);
+            }
+        }
+
+        // --- 7. Charts & Main Loop ---
+        function initChart() {
+            if(state.chart) state.chart.destroy();
+            const ctx = document.getElementById('coolingLoadChart').getContext('2d');
+            state.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Comfort Zone Upper', data: [], borderColor: 'transparent', pointRadius: 0, fill: 1, backgroundColor: COLORS.COMFORT_BAND },
+                        { label: 'Comfort Zone Lower', data: [], borderColor: 'transparent', pointRadius: 0 },
+                        { label: 'Actual Load', data: [], borderColor: COLORS.ACTUAL, backgroundColor: 'rgba(250, 204, 21, 0.1)', borderWidth: 3, tension: 0.4, pointRadius: 0 },
+                        { label: 'Optimized Load', data: [], borderColor: COLORS.OPTIMIZED, backgroundColor: 'rgba(34, 197, 94, 0.1)', borderWidth: 3, tension: 0.4, pointRadius: 0 },
+                        { label: 'Forecast Load', data: [], borderColor: COLORS.PREDICTED, borderDash: [6, 4], borderWidth: 2, tension: 0.4, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false, 
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'hour', displayFormats: { hour: 'MM-dd HH:mm' }, tooltipFormat: 'yyyy-MM-dd HH:mm' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', maxRotation: 0, maxTicksLimit: 8, autoSkip: true } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' }, title: { display: true, text: 'Load (kW)', color: '#6b7280' } }
+                    }
+                }
+            });
+        }
+
+        function updateChartAndKPI() {
+            try {
+                if(!state.chart || state.timestamps.length === 0) return;
+
+                const nowIndex = state.currentIndex;
+                const startIndex = Math.max(0, nowIndex - CONFIG.WINDOW_SIZE);
+                const futureEndIndex = nowIndex + CONFIG.LOOKAHEAD_HOURS;
+                
+                const chartLabels = [], actualData = [], optimizedData = [], predictedData = [];
+                const upperBand = [], lowerBand = [];
+                
+                if (nowIndex < state.timestamps.length) {
+                    const nowTs = state.timestamps[nowIndex].getTime();
+                    const baseSid = state.baselineStrategyMap[nowTs];
+                    const baseData = state.allDataMap[nowTs][baseSid];
+                    
+                    if (state.aiMode) {
+                        const currentLoad = state.scenarioData[nowTs][state.userStrategy].actual;
+                        const ideal = baseData.idealOls;
+                        if (Math.abs(currentLoad - ideal) > 100) {
+                            triggerAIIntervention(nowTs, state.userStrategy, ideal, baseData.thermalDemand);
+                        }
+                    }
+
+                    // --- KPI Accumulation ---
+                    const baselineLoad = baseData.actual;
+                    const currentLoad = state.scenarioData[nowTs][state.userStrategy].actual;
+
+                    const diff = Math.max(0, baselineLoad - currentLoad);
+                    if (diff > 0) {
+                         const savedElec = diff / CONFIG.AVG_COP;
+                         state.stats.savedLoad += diff; // Cooling Load
+                         state.stats.savedElec += savedElec; // Elec Load
+                         state.stats.savedMoney += savedElec * CONFIG.COST_PER_KWH;
+                         state.stats.savedCo2 += savedElec * CONFIG.CO2_PER_KWH;
+                    }
+                    
+                    state.userOperationHistory[nowTs] = state.userStrategy;
+                }
+
+                for(let i = startIndex; i <= futureEndIndex; i++) {
+                    if(i >= state.timestamps.length) break;
+                    if(!state.timestamps[i]) break;
+
+                    const tsDate = state.timestamps[i];
+                    const tsKey = tsDate.getTime(); 
+                    chartLabels.push(tsDate);
+
+                    const baseSid = state.baselineStrategyMap[tsKey];
+                    if (!state.allDataMap[tsKey]) continue;
+
+                    const baseData = state.allDataMap[tsKey][baseSid];
+                    const ideal = baseData.idealOls;
+
+                    upperBand.push({x: tsDate, y: ideal * (1 + CONFIG.COMFORT_TOLERANCE)});
+                    lowerBand.push({x: tsDate, y: ideal * (1 - CONFIG.COMFORT_TOLERANCE)});
+
+                    if (i <= nowIndex) {
+                        let effectiveUserSid = state.userOperationHistory[tsKey] || baseSid;
+                        const optLoad = state.scenarioData[tsKey][effectiveUserSid].actual;
+
+                        actualData.push({x: tsDate, y: baseData.actual});
+                        optimizedData.push({x: tsDate, y: optLoad});
+                        predictedData.push({x: tsDate, y: baseData.predicted});
+
+                        if(i === nowIndex) {
+                            updateSparkData(baseData.actual, baseData.predicted, optLoad);
+                            updateDOMKPI(baseData.actual, optLoad, baseData.predicted, baseData.temp, baseData.idealOls);
+                        }
+                    } else {
+                        const futurePred = state.allDataMap[tsKey][baseSid].predicted;
+                        predictedData.push({x: tsDate, y: futurePred});
+                    }
+                }
+
+                state.chart.data.labels = chartLabels;
+                state.chart.data.datasets[0].data = upperBand; 
+                state.chart.data.datasets[1].data = lowerBand; 
+                state.chart.data.datasets[2].data = actualData;
+                state.chart.data.datasets[3].data = optimizedData;
+                state.chart.data.datasets[4].data = predictedData;
+                state.chart.update('none');
+                updateSparklines();
+            } catch (e) {
+                console.error("Chart Update Error:", e);
+            }
+        }
+
+        function updateSparkData(act, pred, opt) {
+            state.sparklineData.actual.push(act);
+            state.sparklineData.predicted.push(pred);
+            state.sparklineData.optimized.push(opt);
+            if(state.sparklineData.actual.length > 24) state.sparklineData.actual.shift();
+            if(state.sparklineData.predicted.length > 24) state.sparklineData.predicted.shift();
+            if(state.sparklineData.optimized.length > 24) state.sparklineData.optimized.shift();
+        }
+
+        // --- 8. DOM Updates ---
+        function getComfortStatus(currentLoad, idealLoad) {
+            if(idealLoad <= 100) return { text: 'Offline', color: 'bg-gray-700 text-gray-400', glow: 'glow-neutral' };
+            if(currentLoad <= 10) return { text: 'Critical Under-cooling', color: 'bg-red-900 text-white animate-pulse', glow: 'glow-red' };
+            const deviation = (currentLoad - idealLoad) / idealLoad;
+            if(deviation < -CONFIG.COMFORT_TOLERANCE) return { text: 'Under-cooling', color: 'bg-red-900/40 text-red-300 border border-red-800', glow: 'glow-red' };
+            if(deviation > CONFIG.COMFORT_TOLERANCE) return { text: 'Over-cooling', color: 'bg-blue-900/40 text-blue-300 border border-blue-800', glow: 'glow-blue' };
+            return { text: 'Balanced', color: 'bg-green-900/40 text-green-300 border border-green-800', glow: 'glow-green' };
+        }
+
+        function updateDOMKPI(act, opt, pred, temp, ideal) {
+            document.getElementById('kpi-actual').textContent = act.toFixed(0);
+            document.getElementById('kpi-optimized').textContent = opt.toFixed(0);
+            document.getElementById('kpi-predicted').textContent = pred ? pred.toFixed(0) : '--';
+            document.getElementById('kpi-ols-ideal').textContent = ideal.toFixed(0);
+            document.getElementById('kpi-temp').textContent = temp.toFixed(1);
+
+            document.getElementById('kpi-saving-total-kwh').textContent = state.stats.savedLoad.toFixed(0);
+            document.getElementById('kpi-saving-total-elec').textContent = state.stats.savedElec.toFixed(0);
+            document.getElementById('kpi-saving-total-money').textContent = state.stats.savedMoney.toFixed(0);
+            document.getElementById('kpi-saving-total-co2').textContent = state.stats.savedCo2.toFixed(1);
+            
+            // Also update Log Modal Header Stats
+            document.getElementById('log-total-kwh').textContent = state.stats.savedLoad.toFixed(1);
+            document.getElementById('log-total-elec').textContent = state.stats.savedElec.toFixed(1);
+            document.getElementById('log-total-money').textContent = state.stats.savedMoney.toFixed(2);
+            document.getElementById('log-total-co2').textContent = state.stats.savedCo2.toFixed(2);
+
+            const statusAct = getComfortStatus(act, ideal);
+            const statusOpt = getComfortStatus(opt, ideal);
+            const statusPred = getComfortStatus(pred, ideal);
+
+            updateBadge('status-actual', statusAct, 'card-actual');
+            updateBadge('status-predicted', statusPred, 'card-predicted');
+            
+            const cardOpt = document.getElementById('card-optimized');
+            const badgeOpt = document.getElementById('status-optimized');
+            
+            if(state.aiMode) {
+                 cardOpt.classList.remove('glow-green', 'glow-blue', 'glow-red', 'glow-neutral');
+                 cardOpt.classList.add('glow-purple');
+                 badgeOpt.textContent = `AI: ${statusOpt.text}`;
+                 badgeOpt.className = "status-badge bg-purple-900 text-purple-100 border border-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]";
+            } else {
+                 updateBadge('status-optimized', statusOpt, 'card-optimized');
+            }
+        }
+
+        function updateBadge(id, statusObj, cardId) {
+            const el = document.getElementById(id);
+            const card = document.getElementById(cardId);
+            el.textContent = statusObj.text;
+            el.className = `status-badge ${statusObj.color}`;
+            card.classList.remove('glow-green', 'glow-blue', 'glow-red', 'glow-neutral', 'glow-purple');
+            card.classList.add(statusObj.glow);
+        }
+
+        // --- 9. Log Modal Logic ---
+        function openLogModal() {
+            renderLogs();
+            document.getElementById('logModal').classList.remove('hidden');
+        }
+        function closeLogModal() {
+            document.getElementById('logModal').classList.add('hidden');
+        }
+        function renderLogs() {
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+            
+            if(state.logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-500 italic">No optimization records yet</td></tr>';
+                return;
+            }
+
+            state.logs.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/30 transition";
+                tr.innerHTML = `
+                    <td class="p-3 text-gray-400 font-mono text-xs">${log.time.toLocaleTimeString()}</td>
+                    <td class="p-3"><span class="bg-purple-900/50 text-purple-300 text-[10px] px-2 py-1 rounded border border-purple-500/30">${log.type}</span></td>
+                    <td class="p-3 font-mono text-xs"><span class="text-red-300">${log.old}</span> → <span class="text-green-300">${log.new}</span></td>
+                    <td class="p-3 font-bold text-teal-400">+${log.savedCooling.toFixed(0)} <span class="text-[10px] font-normal">kWh</span></td>
+                    <td class="p-3 font-bold text-blue-400">+${log.savedElec.toFixed(0)} <span class="text-[10px] font-normal">kWh</span></td>
+                    <td class="p-3 text-yellow-300">$${log.money.toFixed(1)}</td>
+                    <td class="p-3 text-green-300">${log.co2.toFixed(1)} <span class="text-[10px] font-normal">kg</span></td>
+                    <td class="p-3"><span class="text-green-500 text-xs">✔ Executed</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 10. Interaction & Init ---
+        function initControls() {
+            const container = document.getElementById('chillerControls');
+            container.innerHTML = '';
+            for(let i=0; i<CONFIG.CHILLERS; i++) {
+                const div = document.createElement('div');
+                div.className = "flex flex-col items-center p-3 bg-gray-700/30 rounded-lg border border-gray-600/50 shadow-sm backdrop-blur-sm z-10"; // Ensure z-index
+                const label = document.createElement('span');
+                label.className = "text-sm font-bold text-gray-300 mb-2";
+                label.innerText = `Chiller ${i+1}`;
+                const toggleWrapper = document.createElement('div');
+                toggleWrapper.className = "relative inline-block w-12 h-6 align-middle select-none transition duration-200 ease-in";
+                const checkbox = document.createElement('input');
+                checkbox.type = "checkbox";
+                checkbox.className = "toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer toggle-dot";
+                checkbox.style.top = "0"; checkbox.style.left = "0"; checkbox.id = `chiller-toggle-${i}`;
+                const bg = document.createElement('label');
+                bg.htmlFor = `chiller-toggle-${i}`;
+                bg.className = "toggle-bg block overflow-hidden h-6 rounded-full bg-gray-500 cursor-pointer";
+                toggleWrapper.appendChild(checkbox); toggleWrapper.appendChild(bg);
+                div.appendChild(label); div.appendChild(toggleWrapper);
+                
+                toggleWrapper.onclick = (e) => { 
+                    if(state.aiMode) return; 
+                    e.preventDefault(); toggleChiller(i); 
+                };
+                container.appendChild(div);
+            }
+            updateUserStrategyVisuals();
+        }
+
+        function toggleChiller(idx) {
+            const current = state.userStrategy.split('');
+            current[idx] = current[idx] === '1' ? '0' : '1';
+            state.userStrategy = current.join('');
+            
+            updateUserStrategyVisuals();
+            update3DState(state.userStrategy);
+            
+            state.logs.unshift({
+                time: state.timestamps[state.currentIndex] || new Date(),
+                type: 'Manual Operation',
+                old: '----',
+                new: state.userStrategy,
+                savedCooling: 0,
+                savedElec: 0,
+                money: 0, 
+                co2: 0
+            });
+            updateChartAndKPI();
+        }
+
+        function updateUserStrategyVisuals() {
+            document.getElementById('strategyIdDisplay').textContent = state.userStrategy;
+            state.userStrategy.split('').forEach((val, i) => {
+                const checkbox = document.getElementById(`chiller-toggle-${i}`);
+                const bg = checkbox.nextElementSibling;
+                if(val === '1') {
+                    checkbox.checked = true;
+                    checkbox.style.transform = "translateX(100%)";
+                    checkbox.style.borderColor = "#10b981"; 
+                    bg.classList.remove('bg-gray-500'); bg.classList.add('bg-green-500');
+                } else {
+                    checkbox.checked = false;
+                    checkbox.style.transform = "translateX(0)";
+                    checkbox.style.borderColor = "#e5e7eb"; 
+                    bg.classList.remove('bg-green-500'); bg.classList.add('bg-gray-500');
+                }
+            });
+        }
+
+        function updateSparklines() {
+            const len = 12;
+            drawSparkline('spark-actual', state.sparklineData.actual.slice(-len));
+            drawSparkline('spark-predicted', state.sparklineData.predicted.slice(-len));
+            drawSparkline('spark-optimized', state.sparklineData.optimized.slice(-len));
+        }
+        function drawSparkline(id, data) {
+            const svg = document.getElementById(id);
+            if(!data.length) return;
+            const max = Math.max(...data) * 1.1 || 100;
+            const min = Math.min(...data) * 0.9 || 0;
+            const width = 100, height = 40; 
+            const points = data.map((val, i) => {
+                const x = (i / (data.length - 1)) * width;
+                const y = height - ((val - min) / (max - min)) * height;
+                return `${x},${y}`;
+            });
+            const pathD = `M${points.join(' L')}`;
+            svg.innerHTML = `<path d="${pathD}" fill="none" />`;
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        }
+
+        // --- 11. File Operations ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                parseCSV(evt.target.result);
+                onDataReady();
+                showMessage(`File ${file.name} loaded successfully`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadMockData() {
+            const csv = generateMockCSV();
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "hvac_hk_carbon_track.csv"; 
+            link.click();
+        }
+
+        // --- 12. Main Process ---
+        function processMockData() {
+            const csv = generateMockCSV();
+            parseCSV(csv);
+            onDataReady();
+            showMessage('System Reset: Simulation Data Nov 18-24', 'success');
+        }
+
+        function resetDemoMode() {
+            stopAnimation();
+            state.aiMode = false;
+            const aiToggle = document.getElementById('aiModeToggle');
+            if (aiToggle) aiToggle.checked = false;
+            const overlay = document.getElementById('manualControlOverlay');
+            if (overlay) overlay.classList.add('hidden');
+            document.getElementById('card-optimized').classList.remove('ai-active-ring');
+            state.userStrategy = "1111";
+            state.userOperationHistory = {};
+            state.logs = [];
+            state.stats = { savedLoad: 0, savedElec: 0, savedMoney: 0, savedCo2: 0 };
+            processMockData();
+            showMessage('Demo mode reset complete. Presentation state restored.', 'success');
+        }
+
+        function onDataReady() {
+            document.getElementById('chartPlaceholder').classList.add('hidden');
+            document.getElementById('statusIndicator').innerHTML = `<span class="relative flex h-2.5 w-2.5 mr-2"><span class="inline-flex h-full w-full rounded-full bg-green-500"></span></span><span class="text-xs text-green-300 font-medium">Simulation Running</span>`;
+            document.getElementById('playPauseBtn').disabled = false;
+            
+            state.currentIndex = CONFIG.WINDOW_SIZE; 
+            state.userOperationHistory = {};
+            state.logs = [];
+            state.stats = { savedLoad: 0, savedElec: 0, savedMoney: 0, savedCo2: 0 };
+            
+            for(let i=0; i<=state.currentIndex; i++) {
+                if(i < state.timestamps.length) {
+                    const ts = state.timestamps[i].getTime();
+                    state.userOperationHistory[ts] = state.baselineStrategyMap[ts];
+                }
+            }
+
+            initChart();
+            initControls();
+            
+            if (state.timestamps.length > state.currentIndex) {
+                state.userStrategy = state.baselineStrategyMap[state.timestamps[state.currentIndex].getTime()];
+            } else {
+                state.userStrategy = "1111"; 
+            }
+            
+            updateUserStrategyVisuals();
+            update3DState(state.userStrategy);
+            startAnimation();
+        }
+
+        function toggleAnimation() {
+            if(state.isPlaying) stopAnimation();
+            else startAnimation();
+        }
+
+        function startAnimation() {
+            if(state.intervalId) clearInterval(state.intervalId);
+            state.isPlaying = true;
+            const btn = document.getElementById('playPauseBtn');
+            btn.classList.replace('bg-gray-700/80', 'bg-blue-600/80');
+            document.getElementById('playIcon').classList.add('hidden');
+            document.getElementById('pauseIcon').classList.remove('hidden');
+            document.getElementById('playPauseText').textContent = "Pause Demo";
+
+            state.intervalId = setInterval(() => {
+                state.currentIndex += CONFIG.STEP_SIZE;
+                if(state.currentIndex >= state.timestamps.length - CONFIG.LOOKAHEAD_HOURS) {
+                    stopAnimation(); 
+                    showMessage("Simulation Cycle Ended", "success");
+                } else {
+                    updateChartAndKPI();
+                }
+            }, CONFIG.ANIMATION_SPEED);
+        }
+
+        function stopAnimation() {
+            state.isPlaying = false;
+            clearInterval(state.intervalId);
+            const btn = document.getElementById('playPauseBtn');
+            btn.classList.replace('bg-blue-600/80', 'bg-gray-700/80');
+            document.getElementById('playIcon').classList.remove('hidden');
+            document.getElementById('pauseIcon').classList.add('hidden');
+            document.getElementById('playPauseText').textContent = "Resume Demo";
+        }
+
+        function showMessage(msg, type) {
+            const box = document.getElementById('messageBox');
+            box.textContent = msg;
+            box.className = `fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl transition-all duration-300 transform z-50 flex items-center gap-3 border backdrop-blur-md ${type==='success'?'bg-green-900/80 border-green-700 text-green-100':'bg-red-900/80 border-red-700 text-red-100'}`;
+            box.classList.remove('opacity-0', 'translate-y-20');
+            setTimeout(() => box.classList.add('opacity-0', 'translate-y-20'), 3000);
+        }
+
+        window.onload = () => { 
+            init3D();
+            setTimeout(processMockData, 500); 
+        };
+    </script>
+</body>
+</html>

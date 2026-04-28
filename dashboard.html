@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>反馈数据看板 - 空调体感</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0f1117; color:#e8eaf0; font-family:'PingFang SC',-apple-system,sans-serif; min-height:100vh; padding:24px; }
+    h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+    .subtitle { font-size:13px; color:#6b7a8d; margin-bottom:28px; }
+
+    .status-bar { display:flex; align-items:center; gap:10px; background:#1a1d27; border-radius:12px; padding:12px 18px; margin-bottom:24px; font-size:13px; flex-wrap:wrap; gap:8px; }
+    .dot { width:9px; height:9px; border-radius:50%; background:#3a3f50; flex-shrink:0; }
+    .dot.on  { background:#00b894; box-shadow:0 0 8px #00b89488; animation:pulse 1.5s infinite; }
+    .dot.err { background:#e17055; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .status-label { color:#aab; }
+    .status-val   { color:#e8eaf0; font-weight:600; }
+    .spacer { flex:1; min-width:10px; }
+    .total-badge { background:#252938; border-radius:20px; padding:4px 14px; font-size:13px; white-space:nowrap; }
+    .total-badge strong { color:#00d4a0; }
+    .clear-stat-btn { background:none; border:1px solid #2a3040; border-radius:8px; color:#6b7a8d; font-size:11px; padding:5px 12px; cursor:pointer; white-space:nowrap; transition:all .2s; }
+    .clear-stat-btn:hover { border-color:#e17055; color:#e17055; }
+
+    /* 数据来源说明 */
+    .source-tip { background:#1a1d27; border-radius:10px; padding:10px 16px; margin-bottom:20px; font-size:12px; color:#6b7a8d; display:flex; align-items:center; gap:8px; }
+    .source-tip span { color:#a29bfe; font-weight:600; }
+
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px; margin-bottom:28px; }
+    .stat-card { background:#1a1d27; border-radius:14px; padding:16px 14px; text-align:center; transition:transform .2s; }
+    .stat-card:hover { transform:translateY(-2px); }
+    .stat-emoji { font-size:28px; display:block; margin-bottom:6px; }
+    .stat-label { font-size:13px; color:#8899aa; margin-bottom:4px; }
+    .stat-count { font-size:26px; font-weight:800; }
+    .stat-pct   { font-size:11px; color:#6b7a8d; margin-top:2px; }
+
+    .bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .bar-label { width:56px; font-size:12px; color:#8899aa; text-align:right; flex-shrink:0; }
+    .bar-wrap  { flex:1; background:#252938; border-radius:6px; height:10px; overflow:hidden; }
+    .bar-fill  { height:100%; border-radius:6px; transition:width .5s ease; }
+    .bar-count { width:28px; font-size:12px; color:#6b7a8d; text-align:right; flex-shrink:0; }
+
+    h2 { font-size:15px; font-weight:600; color:#8899aa; margin-bottom:12px; letter-spacing:.5px; }
+    .feed { display:flex; flex-direction:column; gap:8px; }
+    .feed-item { background:#1a1d27; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:14px; animation:slideIn .3s ease; }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+    .feed-emoji { font-size:26px; flex-shrink:0; }
+    .feed-main  { flex:1; }
+    .feed-feeling { font-size:16px; font-weight:700; }
+    .feed-time  { font-size:11px; color:#5a6a7a; margin-top:2px; }
+    .feed-source { display:inline-block; margin-top:4px; font-size:11px; background:rgba(162,155,254,.15); color:#a29bfe; border-radius:10px; padding:1px 8px; }
+    .feed-geo { margin-top:6px; font-size:11px; color:#9fc3ff; line-height:1.45; word-break:break-word; }
+    .feed-empty { color:#3a4a5a; font-size:13px; text-align:center; padding:32px 0; }
+
+    .clear-btn { background:none; border:1px solid #2a3040; border-radius:8px; color:#6b7a8d; font-size:12px; padding:5px 14px; cursor:pointer; transition:all .2s; float:right; margin-top:-2px; }
+    .clear-btn:hover { border-color:#e17055; color:#e17055; }
+
+    .section-box { background:#1a1d27; border-radius:14px; padding:18px 20px; margin-bottom:20px; }
+    .building-bar { background:#1a1d27; border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:12px; color:#aab; line-height:1.55; word-break:break-word; }
+    .building-bar strong { color:#e8eaf0; font-weight:700; }
+  </style>
+</head>
+<body>
+
+<h1>🌡️ 空调体感 · 反馈看板</h1>
+<p class="subtitle">实时采集用户感受数据 · HiveMQ MQTT</p>
+<div class="building-bar" id="buildingBar"><strong>建筑定位</strong>：加载中…</div>
+
+<div class="status-bar">
+  <div class="dot" id="dot"></div>
+  <span class="status-label">MQTT：</span>
+  <span class="status-val" id="statusVal">连接中...</span>
+  <div class="spacer"></div>
+  <div class="total-badge">共 <strong id="totalCount">0</strong> 条反馈</div>
+  <button class="clear-stat-btn" onclick="clearAllData()">清空数据</button>
+</div>
+
+<!-- 数据来源说明 -->
+<div class="source-tip">
+  💡 统计数据包含：<span>历史累计（retained）</span> + 本次会话实时数据。即使用户先于看板提交，数据也不丢失。
+</div>
+
+<!-- 统计网格 -->
+<div class="stats-grid" id="statsGrid"></div>
+
+<!-- 分布条形图 -->
+<div class="section-box">
+  <h2>📊 感受分布</h2>
+  <div id="barChart"></div>
+</div>
+
+<!-- 实时消息流 -->
+<div class="section-box">
+  <h2 style="display:inline-block;">📡 实时消息流</h2>
+  <button class="clear-btn" onclick="clearFeed()">清空</button>
+  <div style="clear:both;height:12px;"></div>
+  <div class="feed" id="feed">
+    <div class="feed-empty">等待接收用户反馈...</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   配置
+   ============================================================ */
+const BROKER      = 'wss://broker.hivemq.com:8884/mqtt'
+const TOPIC       = 'ac-feedback/responses'   // 实时单条
+const TOPIC_STAT  = 'ac-feedback/stats'        // retained 累计统计
+const CLIENT_ID   = 'dash-' + Math.random().toString(16).slice(2,10)
+const FEED_KEY    = 'ac_feed_v1'   // localStorage key for 消息流缓存
+const MAX_FEED    = 50
+const NETWORK_FALLBACK_BUILDING = 'Building E, Chuangzhi Cloud City, Nanshan, Shenzhen, China'
+let buildingRealtimeLocation = NETWORK_FALLBACK_BUILDING
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function composeBuildingRealtimeLocation(b) {
+  if (!b || typeof b !== 'object') return ''
+  const direct = (b.realtime_location || b.address || b.address_en || b.address_zh || '').toString().trim()
+  if (direct) return direct
+  const name = (b.name_en || b.name_zh || '').toString().trim()
+  const campus = (b.campus_en || b.campus_zh || '').toString().trim()
+  const lat = Number(b.latitude), lng = Number(b.longitude)
+  const parts = []
+  if (name) parts.push(name)
+  if (campus) parts.push(campus)
+  if (Number.isFinite(lat) && Number.isFinite(lng)) parts.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`)
+  return parts.join(' · ')
+}
+
+function refreshBuildingBar() {
+  const el = document.getElementById('buildingBar')
+  if (!el) return
+  el.innerHTML = `<strong>建筑定位</strong>：${escapeHtml(buildingRealtimeLocation || '—')}`
+}
+
+refreshBuildingBar()
+
+fetch('/api/building')
+  .then(r => r.json())
+  .then(b => {
+    const next = composeBuildingRealtimeLocation(b)
+    buildingRealtimeLocation = (next && next.trim()) ? next.trim() : NETWORK_FALLBACK_BUILDING
+    refreshBuildingBar()
+  })
+  .catch(() => {
+    buildingRealtimeLocation = NETWORK_FALLBACK_BUILDING
+    refreshBuildingBar()
+  })
+
+const FEELINGS = [
+  {feeling:'很冷',   emoji:'🥶', color:'#74b9ff'},
+  {feeling:'有点冷', emoji:'🌨️', color:'#a29bfe'},
+  {feeling:'微凉',   emoji:'🌤️', color:'#55efc4'},
+  {feeling:'刚刚好', emoji:'😊', color:'#00b894'},
+  {feeling:'有点暖', emoji:'🌞', color:'#fdcb6e'},
+  {feeling:'有点热', emoji:'😅', color:'#e17055'},
+  {feeling:'很热',   emoji:'🥵', color:'#e84393'},
+  {feeling:'极热',   emoji:'🔥', color:'#d63031'},
+]
+
+/* ============================================================
+   状态管理
+   counts：本次会话累计 + retained 基准
+   ============================================================ */
+const counts = {}
+FEELINGS.forEach(f => counts[f.feeling] = 0)
+let total = 0
+let retainedLoaded = false   // 是否已收到 retained 统计
+
+/* ---------- localStorage 消息流缓存 ---------- */
+function loadFeedCache() {
+  try { return JSON.parse(localStorage.getItem(FEED_KEY)) || [] } catch(e) { return [] }
+}
+function saveFeedCache(items) {
+  localStorage.setItem(FEED_KEY, JSON.stringify(items.slice(0, MAX_FEED)))
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+function renderStats() {
+  document.getElementById('statsGrid').innerHTML = FEELINGS.map(f => `
+    <div class="stat-card">
+      <span class="stat-emoji">${f.emoji}</span>
+      <div class="stat-label">${f.feeling}</div>
+      <div class="stat-count" id="cnt-${f.feeling}" style="color:${f.color}">0</div>
+      <div class="stat-pct"  id="pct-${f.feeling}">-</div>
+    </div>`).join('')
+}
+
+function renderBars() {
+  document.getElementById('barChart').innerHTML = FEELINGS.map(f => `
+    <div class="bar-row">
+      <div class="bar-label">${f.emoji} ${f.feeling}</div>
+      <div class="bar-wrap"><div class="bar-fill" id="bar-${f.feeling}" style="background:${f.color};width:0%"></div></div>
+      <div class="bar-count" id="bc-${f.feeling}">0</div>
+    </div>`).join('')
+}
+
+function updateStats() {
+  document.getElementById('totalCount').textContent = total
+  FEELINGS.forEach(f => {
+    const c   = counts[f.feeling] || 0
+    const pct = total ? Math.round(c / total * 100) : 0
+    document.getElementById('cnt-' + f.feeling).textContent  = c
+    document.getElementById('pct-' + f.feeling).textContent  = total ? pct + '%' : '-'
+    document.getElementById('bar-' + f.feeling).style.width  = pct + '%'
+    document.getElementById('bc-'  + f.feeling).textContent  = c
+  })
+}
+
+/* ============================================================
+   消息流
+   ============================================================ */
+function buildRealtimeGeoText(data) {
+  const direct = (data.realtime_location || data.real_time_location || data.current_location || data.address || '').toString().trim()
+  if (direct) return direct
+
+  const city = (data.city || '').toString().trim()
+  const district = (data.district || '').toString().trim()
+  const building = (data.building || data.block || '').toString().trim()
+  const floor = (data.floor || '').toString().trim()
+  const room = (data.room || data.room_id || '').toString().trim()
+
+  const parts = []
+  if (city) parts.push(city)
+  if (district) parts.push(district)
+  if (building) parts.push(building)
+  if (floor) parts.push(floor)
+  if (room) parts.push(room)
+  if (parts.length) return parts.join(' ')
+
+  const lat = Number(data.lat ?? data.latitude)
+  const lng = Number(data.lng ?? data.lon ?? data.longitude)
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+
+  return (buildingRealtimeLocation || '').trim()
+}
+
+function addFeedItem(data, prepend = true, save = true) {
+  const feed  = document.getElementById('feed')
+  const empty = feed.querySelector('.feed-empty')
+  if (empty) empty.remove()
+
+  const f    = FEELINGS.find(x => x.feeling === data.feeling) || {emoji:'❓', color:'#aaa'}
+  const time = new Date(data.timestamp || Date.now()).toLocaleTimeString('zh-CN')
+
+  const el = document.createElement('div')
+  el.className = 'feed-item'
+  const sourceTag = (data.source && data.source !== 'unknown')
+    ? `<span class="feed-source">📍 ${escapeHtml(data.source)}</span>`
+    : ''
+  const geoText = buildRealtimeGeoText(data)
+  const geoTag = geoText ? `<div class="feed-geo"><strong>建筑/实时定位</strong>：${escapeHtml(geoText)}</div>` : ''
+  el.innerHTML = `
+    <div class="feed-emoji">${f.emoji}</div>
+    <div class="feed-main">
+      <div class="feed-feeling" style="color:${f.color}">${escapeHtml(data.feeling || '')}</div>
+      <div class="feed-time">${time} · ${escapeHtml((data.client||'').slice(0,12) || '匿名')}</div>
+      ${sourceTag}
+      ${geoTag}
+    </div>`
+
+  if (prepend) feed.insertBefore(el, feed.firstChild)
+  else feed.appendChild(el)
+
+  // 保留最多 MAX_FEED 条
+  const items = feed.querySelectorAll('.feed-item')
+  if (items.length > MAX_FEED) items[items.length-1].remove()
+
+  // 持久化缓存
+  if (save) {
+    const cache = loadFeedCache()
+    cache.unshift({
+      feeling: data.feeling,
+      timestamp: data.timestamp||new Date().toISOString(),
+      client: data.client||'',
+      source: data.source||'',
+      realtime_location: geoText || ''
+    })
+    saveFeedCache(cache)
+  }
+}
+
+function clearFeed() {
+  localStorage.removeItem(FEED_KEY)
+  document.getElementById('feed').innerHTML = '<div class="feed-empty">等待接收用户反馈...</div>'
+}
+
+function clearAllData() {
+  if (!confirm('确定要清空所有数据（统计 + 消息流）？')) return
+  localStorage.removeItem(FEED_KEY)
+  FEELINGS.forEach(f => counts[f.feeling] = 0)
+  total = 0
+  updateStats()
+  clearFeed()
+  // 同时清空 retained 统计
+  if (mqttClient && mqttClient.connected) {
+    mqttClient.publish(TOPIC_STAT, '', { qos:1, retain:true })
+  }
+}
+
+/* ============================================================
+   从缓存恢复消息流（页面刷新后继续显示）
+   ============================================================ */
+function restoreFeedFromCache() {
+  const cache = loadFeedCache()
+  if (cache.length === 0) return
+  cache.forEach(item => addFeedItem(item, false, false))
+}
+
+/* ============================================================
+   MQTT
+   ============================================================ */
+let mqttClient = null
+
+function initMQTT() {
+  mqttClient = mqtt.connect(BROKER, { clientId: CLIENT_ID, clean: true, connectTimeout: 8000, reconnectPeriod: 3000 })
+
+  mqttClient.on('connect', () => {
+    document.getElementById('dot').className = 'dot on'
+    document.getElementById('statusVal').textContent = '已连接 broker.hivemq.com'
+    // 同时订阅实时消息 和 retained 统计
+    mqttClient.subscribe([TOPIC, TOPIC_STAT], { qos: 1 })
+  })
+
+  mqttClient.on('message', (topic, payload) => {
+    const raw = payload.toString()
+    if (!raw) return   // 清空 retained 时会收到空消息
+
+    try {
+      const data = JSON.parse(raw)
+
+      if (topic === TOPIC_STAT) {
+        // retained 统计：作为基准写入 counts
+        if (!retainedLoaded) {
+          retainedLoaded = true
+          FEELINGS.forEach(f => {
+            const v = data[f.feeling]
+            if (v) { counts[f.feeling] = v; total += v }
+          })
+          updateStats()
+        }
+        return
+      }
+
+      // 实时单条消息
+      if (data.feeling) {
+        counts[data.feeling] = (counts[data.feeling] || 0) + 1
+        total++
+        updateStats()
+        addFeedItem(data)
+      }
+    } catch(e) { console.warn('解析消息失败', e) }
+  })
+
+  mqttClient.on('error', () => {
+    document.getElementById('dot').className = 'dot err'
+    document.getElementById('statusVal').textContent = '连接失败，重试中...'
+  })
+
+  mqttClient.on('close', () => {
+    document.getElementById('dot').className = 'dot err'
+    document.getElementById('statusVal').textContent = '已断开，重连中...'
+  })
+}
+
+// 启动
+renderStats()
+renderBars()
+restoreFeedFromCache()   // 先从缓存恢复消息流
+initMQTT()               // 再连接 MQTT 接收新消息
+</script>
+</body>
+</html>

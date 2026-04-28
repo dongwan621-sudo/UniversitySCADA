@@ -40,6 +40,10 @@ body{overflow:hidden}
     <button class="floor-tab" id="tab-gf" onclick="switchFloor('GF')">G/F</button>
     <button class="floor-tab" id="tab-1f" onclick="switchFloor('1F')">1/F</button>
   </div>
+  <div class="panel-title mt-8">■ BUILDING LOCATION</div>
+  <div class="panel" style="padding:12px">
+    <div id="building-loc" style="font-size:10px;color:var(--text2);line-height:1.55;word-break:break-word">Loading…</div>
+  </div>
   <div class="panel-title mt-8">■ ROOM STATS</div>
   <div class="panel" style="padding:12px">
     <div class="stat-row"><span class="stat-label">Avg Temp</span><span class="stat-value cyan" id="s-temp">—°C</span></div>
@@ -96,6 +100,30 @@ const FLOOR_ID = "{{ floor_id }}";
 let curFloor = FLOOR_ID;
 
 setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);
+
+function composeBuildingLabel(b){
+  if(!b||typeof b!=='object') return '';
+  const direct=(b.address_en||b.address||b.address_zh||'').toString().trim();
+  if(direct) return direct;
+  const name=(b.name_en||b.name_zh||'').toString().trim();
+  const campus=(b.campus_en||b.campus_zh||'').toString().trim();
+  const lat=Number(b.latitude), lng=Number(b.longitude);
+  const parts=[];
+  if(name) parts.push(name);
+  if(campus) parts.push(campus);
+  if(Number.isFinite(lat)&&Number.isFinite(lng)) parts.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+  return parts.join(' · ');
+}
+
+fetch('/api/building').then(r=>r.json()).then(b=>{
+  const el=document.getElementById('building-loc');
+  if(!el) return;
+  const txt=composeBuildingLabel(b);
+  el.textContent = txt || '—';
+}).catch(()=>{
+  const el=document.getElementById('building-loc');
+  if(el) el.textContent='—';
+});
 
 // Highlight nav
 document.getElementById('nav-gf').className = FLOOR_ID==='GF'?'active':'';

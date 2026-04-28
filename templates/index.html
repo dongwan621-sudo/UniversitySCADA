@@ -39,8 +39,9 @@ body{overflow:hidden}
 
 <!-- LEFT sidebar -->
 <div class="sidebar-left">
-  <div class="panel-title">■ PATRICK LEE BUILDING</div>
-  <div style="font-size:10px;color:var(--text3);line-height:1.6">李運強教學大樓<br>Lingnan University, Tuen Mun</div>
+  <div class="panel-title" id="building-title">■ BUILDING</div>
+  <div id="building-subtitle" style="font-size:10px;color:var(--text3);line-height:1.6"></div>
+  <div id="building-loc" style="font-size:10px;color:var(--text2);line-height:1.55;margin-top:6px;word-break:break-word"></div>
   <div style="display:flex;gap:6px;margin-top:4px">
     <button class="floor-btn active" id="btn-gf" onclick="setFloor('GF')">G/F</button>
     <button class="floor-btn" id="btn-1f" onclick="setFloor('1F')">1/F</button>
@@ -86,6 +87,34 @@ body{overflow:hidden}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 setInterval(()=>{ document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8); },1000);
+
+function composeBuildingLabel(b){
+  if(!b||typeof b!=='object') return '';
+  const direct=(b.address_en||b.address||b.address_zh||'').toString().trim();
+  if(direct) return direct;
+  const name=(b.name_en||b.name_zh||'').toString().trim();
+  const campus=(b.campus_en||b.campus_zh||'').toString().trim();
+  const lat=Number(b.latitude), lng=Number(b.longitude);
+  const parts=[];
+  if(name) parts.push(name);
+  if(campus) parts.push(campus);
+  if(Number.isFinite(lat)&&Number.isFinite(lng)) parts.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+  return parts.join(' · ');
+}
+
+fetch('/api/building').then(r=>r.json()).then(b=>{
+  const titleEl=document.getElementById('building-title');
+  const subEl=document.getElementById('building-subtitle');
+  const locEl=document.getElementById('building-loc');
+  const name=(b&&((b.name_en||b.name_zh)||'')).toString().trim();
+  const campus=(b&&((b.campus_en||b.campus_zh)||'')).toString().trim();
+  if(titleEl) titleEl.textContent = name ? ('■ '+name.toUpperCase()) : '■ BUILDING';
+  if(subEl) subEl.textContent = campus || '';
+  if(locEl){
+    const txt=composeBuildingLabel(b);
+    locEl.textContent = txt ? ('📍 '+txt) : '';
+  }
+}).catch(()=>{});
 
 // ── Data (runs independently of Three.js) ────────────────────────────────────
 let currentFloor = 'GF';

@@ -15,36 +15,48 @@ body{overflow:hidden}
 .ib-label{font-size:9px;letter-spacing:1px;color:var(--text3)}
 .ib-val{font-size:16px;font-weight:700;font-family:monospace}
 .ib-sep{width:1px;height:36px;background:var(--border)}
-/* ── AC Feedback Dashboard (right panel) ── */
-.dash-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#13161f;border-bottom:1px solid var(--border);font-size:11px;flex-shrink:0}
-.dash-dot{width:8px;height:8px;border-radius:50%;background:#3a3f50;flex-shrink:0}
-.dash-dot.on{background:#00b894;box-shadow:0 0 6px #00b89488;animation:dpulse 1.5s infinite}
-.dash-dot.err{background:#e17055}
+/* ── AC Feedback Dashboard (right panel; synced with dashboard.html) ── */
+.fb-wrap{padding:12px}
+.fb-title{font-size:18px;font-weight:700;margin-bottom:4px}
+.fb-subtitle{font-size:12px;color:#6b7a8d;margin-bottom:14px}
+.fb-building-line{font-size:11px;color:#9fb2c6;line-height:1.45;margin:-8px 0 12px;word-break:break-word}
+.fb-status{display:flex;align-items:center;gap:8px;background:#1a1d27;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;flex-wrap:wrap}
+.fb-dot{width:9px;height:9px;border-radius:50%;background:#3a3f50;flex-shrink:0}
+.fb-dot.on{background:#00b894;box-shadow:0 0 8px #00b89488;animation:dpulse 1.5s infinite}
+.fb-dot.err{background:#e17055}
 @keyframes dpulse{0%,100%{opacity:1}50%{opacity:.4}}
-.dash-status-val{color:#e8eaf0;font-weight:600;flex:1}
-.dash-total{background:#1e2130;border-radius:12px;padding:2px 10px;font-size:11px;white-space:nowrap;color:#8899aa}
-.dash-total strong{color:#00d4a0}
-.dash-scroll{flex:1;overflow-y:auto;padding:12px}
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.stat-card{background:#13161f;border-radius:10px;padding:10px 8px;text-align:center}
-.stat-emoji{font-size:20px;display:block;margin-bottom:3px}
-.stat-label-d{font-size:10px;color:#8899aa;margin-bottom:2px}
-.stat-count-d{font-size:20px;font-weight:800;line-height:1}
-.stat-pct-d{font-size:10px;color:#6b7a8d;margin-top:1px}
-.dash-section{background:#13161f;border-radius:10px;padding:12px;margin-bottom:12px}
-.dash-h2{font-size:11px;font-weight:600;color:#8899aa;margin-bottom:10px;letter-spacing:.5px}
-.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
-.bar-label{width:48px;font-size:10px;color:#8899aa;text-align:right;flex-shrink:0}
-.bar-wrap{flex:1;background:#1e2130;border-radius:4px;height:8px;overflow:hidden}
-.bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
-.bar-count{width:22px;font-size:10px;color:#6b7a8d;text-align:right;flex-shrink:0}
-.feed{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
-.feed-item{background:#1a1d27;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:10px;animation:fslide .3s ease}
+.fb-status-label{color:#aab}
+.fb-status-val{color:#e8eaf0;font-weight:600}
+.fb-spacer{flex:1;min-width:10px}
+.fb-total{background:#252938;border-radius:16px;padding:4px 10px;font-size:12px;white-space:nowrap}
+.fb-total strong{color:#00d4a0}
+.fb-btn{background:none;border:1px solid #2a3040;border-radius:8px;color:#6b7a8d;font-size:11px;padding:4px 10px;cursor:pointer}
+.fb-btn:hover{border-color:#e17055;color:#e17055}
+.fb-tip{background:#1a1d27;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#6b7a8d}
+.fb-tip span{color:#a29bfe;font-weight:600}
+.fb-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.fb-stat-card{background:#1a1d27;border-radius:10px;padding:10px 8px;text-align:center}
+.fb-stat-emoji{font-size:20px;display:block;margin-bottom:3px}
+.fb-stat-label{font-size:10px;color:#8899aa;margin-bottom:2px}
+.fb-stat-count{font-size:20px;font-weight:800;line-height:1}
+.fb-stat-pct{font-size:10px;color:#6b7a8d;margin-top:1px}
+.fb-section{background:#1a1d27;border-radius:10px;padding:12px;margin-bottom:12px}
+.fb-h2{font-size:11px;font-weight:600;color:#8899aa;margin-bottom:10px;letter-spacing:.5px}
+.fb-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.fb-bar-label{width:48px;font-size:10px;color:#8899aa;text-align:right;flex-shrink:0}
+.fb-bar-wrap{flex:1;background:#252938;border-radius:4px;height:8px;overflow:hidden}
+.fb-bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.fb-bar-count{width:22px;font-size:10px;color:#6b7a8d;text-align:right;flex-shrink:0}
+.fb-feed{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.fb-feed-item{background:#1a1d27;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:10px;animation:fslide .3s ease}
 @keyframes fslide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-.feed-emoji{font-size:20px;flex-shrink:0}
-.feed-feeling{font-size:13px;font-weight:700}
-.feed-time{font-size:10px;color:#5a6a7a;margin-top:1px}
-.feed-empty{color:#3a4a5a;font-size:12px;text-align:center;padding:20px 0}
+.fb-feed-emoji{font-size:20px;flex-shrink:0}
+.fb-feed-feeling{font-size:13px;font-weight:700}
+.fb-feed-time{font-size:10px;color:#5a6a7a;margin-top:1px}
+.fb-feed-source{display:inline-block;margin-top:3px;font-size:10px;background:rgba(162,155,254,.15);color:#a29bfe;border-radius:10px;padding:1px 6px}
+.fb-feed-location{display:inline-block;margin-top:3px;margin-left:4px;font-size:10px;background:rgba(0,212,160,.14);color:#62f6d4;border-radius:10px;padding:1px 6px}
+.fb-feed-geo{display:block;margin-top:4px;font-size:10px;color:#9fc3ff;word-break:break-word}
+.fb-feed-empty{color:#3a4a5a;font-size:12px;text-align:center;padding:20px 0}
 .setpt-box{background:#13161f;border-radius:10px;padding:12px;margin-bottom:12px}
 .setpt-slider{width:100%;margin-top:10px;accent-color:#00d4a0}
 .setpt-scale{display:flex;justify-content:space-between;font-size:10px;color:#6b7a8d;margin-top:2px}
@@ -109,42 +121,36 @@ body{overflow:hidden}
 
 <!-- RIGHT panel — AC Feedback Dashboard -->
 <div class="side-panel">
-  <!-- MQTT status bar -->
-  <div class="dash-status">
-    <div class="dash-dot" id="dash-dot"></div>
-    <span class="dash-status-val" id="dash-status">Connecting…</span>
-    <div class="dash-total">Total <strong id="dash-total">0</strong></div>
-  </div>
+  <div class="fb-wrap">
+    <div class="fb-title">🌡️ 空调体感 · 反馈看板</div>
+    <div class="fb-subtitle">{{ room_id }} · HiveMQ MQTT</div>
+    <div class="fb-building-line" id="fb-building">Building location: loading…</div>
 
-  <div class="dash-scroll">
-    <!-- room label -->
-    <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--text3);margin-bottom:10px">■ {{ room_id }} · 空调体感反馈</div>
-
-    <!-- 8-feeling stat cards -->
-    <div class="stats-grid" id="dash-stats"></div>
-
-    <div class="setpt-box">
-      <div class="dash-h2">TEMP ADJUST</div>
-      <div style="font-size:12px;color:#d7e1f1">Setpoint: <strong data-setpt-now>--°C</strong></div>
-      <input class="setpt-slider" type="range" min="18" max="36" step="0.5" value="24" data-setpt-slider>
-      <div class="setpt-scale"><span>18°C</span><span>36°C</span></div>
-      <div class="setpt-msg" data-setpt-msg>Drag to set target temperature (range 18-36°C)</div>
+    <div class="fb-status">
+      <div class="fb-dot" id="dot"></div>
+      <span class="fb-status-label">MQTT:</span>
+      <span class="fb-status-val" id="statusVal">Connecting...</span>
+      <div class="fb-spacer"></div>
+      <div class="fb-total">Total <strong id="totalCount">0</strong></div>
+      <button class="fb-btn" onclick="clearAllData()">Clear Data</button>
     </div>
 
-    <!-- bar chart -->
-    <div class="dash-section">
-      <div class="dash-h2">📊 感受分布</div>
-      <div id="dash-bars"></div>
+    <div class="fb-tip">Stats include <span>retained history</span> + live session data.</div>
+
+    <div class="fb-stats-grid" id="statsGrid"></div>
+
+    <div class="fb-section">
+      <div class="fb-h2">📊 感受分布</div>
+      <div id="barChart"></div>
     </div>
 
-    <!-- live feed -->
-    <div class="dash-section">
+    <div class="fb-section">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="dash-h2" style="margin-bottom:0">📡 实时消息流</div>
-        <button onclick="clearFeed()" style="background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text3);font-size:10px;padding:3px 8px;cursor:pointer">清空</button>
+        <div class="fb-h2" style="margin-bottom:0">📡 实时消息流</div>
+        <button class="fb-btn" onclick="clearFeed()">Clear</button>
       </div>
-      <div class="feed" id="dash-feed">
-        <div class="feed-empty">等待接收用户反馈…</div>
+      <div class="fb-feed" id="feed">
+        <div class="fb-feed-empty">Waiting for feedback...</div>
       </div>
     </div>
   </div>
@@ -154,7 +160,136 @@ body{overflow:hidden}
 const FLOOR_ID = "{{ floor_id }}";
 const ROOM_ID  = "{{ room_id }}";
 const IS_LIB   = ROOM_ID.startsWith('LIB');
+const IS_AUDITORIUM = ROOM_ID === 'LIB-L';
 let ROOM_CAP = 100;
+
+const NETWORK_FALLBACK_BUILDING = 'Building E, Chuangzhi Cloud City, Nanshan, Shenzhen, China';
+let buildingRealtimeLocation = NETWORK_FALLBACK_BUILDING;
+let browserRealtimeLocation = '';
+let browserLocationParts = null;
+let buildingLocationParts = {
+  country: 'China',
+  city: 'Shenzhen',
+  district: 'Nanshan',
+  street: 'Chuangzhi Cloud City',
+  building: 'Building E'
+};
+
+function escapeHtml(s){
+  return String(s??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function composeBuildingRealtimeLocation(b){
+  if(!b||typeof b!=='object') return '';
+  const direct=(b.realtime_location||b.address||b.address_en||b.address_zh||'').toString().trim();
+  if(direct) return direct;
+  const name=(b.name_en||b.name_zh||'').toString().trim();
+  const campus=(b.campus_en||b.campus_zh||'').toString().trim();
+  const lat=Number(b.latitude), lng=Number(b.longitude);
+  const parts=[];
+  if(name) parts.push(name);
+  if(campus) parts.push(campus);
+  if(Number.isFinite(lat)&&Number.isFinite(lng)) parts.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+  return parts.join(' · ');
+}
+
+function cleanText(v){
+  return String(v ?? '').trim();
+}
+
+function composeStructuredLocation(parts){
+  const country=cleanText(parts.country);
+  const city=cleanText(parts.city);
+  const district=cleanText(parts.district);
+  const street=cleanText(parts.street);
+  const building=cleanText(parts.building);
+  const ordered=[
+    country || 'UnknownCountry',
+    city || 'UnknownCity',
+    district || 'UnknownDistrict',
+    street || 'UnknownStreet',
+    building || 'UnknownBuilding'
+  ];
+  return ordered.join('-');
+}
+
+function extractBuildingLocationParts(b){
+  if(!b || typeof b!=='object') return null;
+  const country=cleanText(b.country || b.country_en || b.country_zh);
+  const city=cleanText(b.city || b.city_en || b.city_zh);
+  const district=cleanText(b.district || b.area || b.region);
+  const street=cleanText(b.street || b.road || b.campus_en || b.campus_zh);
+  const building=cleanText(b.building || b.block || b.name_en || b.name_zh);
+  if(!country && !city && !district && !street && !building) return null;
+  return {country, city, district, street, building};
+}
+
+function refreshBuildingUi(){
+  const el=document.getElementById('fb-building');
+  if(el){
+    const uiLocation = browserLocationParts
+      ? composeStructuredLocation(browserLocationParts)
+      : ((browserRealtimeLocation||'').trim() || buildingRealtimeLocation);
+    el.textContent = uiLocation
+      ? ('Building location: '+uiLocation)
+      : 'Building location: —';
+  }
+}
+
+function reverseGeocode(lat, lng){
+  return fetch(`/api/reverse-geocode?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`)
+    .then(r=>r.ok ? r.json() : Promise.reject(new Error('reverse geocode failed')))
+    .then(data=>{
+      if(!data || !data.ok) throw new Error('reverse geocode failed');
+      return {
+        country: cleanText(data.country),
+        city: cleanText(data.city),
+        district: cleanText(data.district),
+        street: cleanText(data.street),
+        building: cleanText(data.building)
+      };
+    });
+}
+
+function requestBrowserRealtimeLocation(){
+  if(!navigator.geolocation) return;
+  const updateFromPosition = (pos)=>{
+    const lat=Number(pos.coords && pos.coords.latitude);
+    const lng=Number(pos.coords && pos.coords.longitude);
+    if(Number.isFinite(lat) && Number.isFinite(lng)){
+      const acc=Number(pos.coords.accuracy);
+      const accText=Number.isFinite(acc)?` (±${Math.round(acc)}m)`:'';
+      browserRealtimeLocation=`${lat.toFixed(6)}, ${lng.toFixed(6)}${accText}`;
+      reverseGeocode(lat, lng).then(parts=>{
+        browserLocationParts = {
+          country: parts.country || buildingLocationParts.country,
+          city: parts.city || buildingLocationParts.city,
+          district: parts.district || buildingLocationParts.district,
+          street: parts.street || buildingLocationParts.street,
+          building: parts.building || buildingLocationParts.building
+        };
+      }).catch(()=>{
+        browserLocationParts = null;
+      }).finally(()=>{
+        refreshBuildingUi();
+      });
+    }
+  };
+  navigator.geolocation.getCurrentPosition(updateFromPosition,()=>{
+    // Ignore permission/location errors and keep existing fallback.
+  },{enableHighAccuracy:true,timeout:8000,maximumAge:60000});
+  navigator.geolocation.watchPosition(updateFromPosition,()=>{
+    // Ignore permission/location errors and keep existing fallback.
+  },{enableHighAccuracy:true,timeout:8000,maximumAge:60000});
+}
+
+refreshBuildingUi();
+requestBrowserRealtimeLocation();
 
 setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);
 
@@ -164,6 +299,17 @@ fetch('/api/meta').then(r=>r.json()).then(meta=>{
     document.getElementById('occ-cap').textContent = String(ROOM_CAP);
   }
 }).catch(()=>{});
+
+fetch('/api/building').then(r=>r.json()).then(b=>{
+  const next = composeBuildingRealtimeLocation(b);
+  buildingRealtimeLocation = (next && next.trim()) ? next.trim() : NETWORK_FALLBACK_BUILDING;
+  const nextParts=extractBuildingLocationParts(b);
+  if(nextParts) buildingLocationParts = nextParts;
+  refreshBuildingUi();
+}).catch(()=>{
+  buildingRealtimeLocation = NETWORK_FALLBACK_BUILDING;
+  refreshBuildingUi();
+});
 
 // ── Bottom bar data (sensor readings) ────────────────────────────────────────
 function updateData(){
@@ -204,7 +350,7 @@ setInterval(updateData,15000);
 const BROKER     = 'wss://broker.hivemq.com:8884/mqtt';
 const TOPIC      = 'ac-feedback/responses';
 const TOPIC_STAT = 'ac-feedback/stats';
-const FEED_KEY   = 'ac_feed_v1';
+const FEED_KEY   = 'ac_feed_v2_classroom';
 const MAX_FEED   = 50;
 
 const FEELINGS = [
@@ -219,67 +365,224 @@ const FEELINGS = [
 ];
 
 const counts = {}; FEELINGS.forEach(f=>counts[f.feeling]=0);
-let dashTotal=0, retainedLoaded=false, mqttClient=null;
+let total=0, retainedLoaded=false, mqttClient=null;
 let setptBusy=false, pendingSetpoint=null, currentSetpoint=24, setpointDebounce=null;
 
 function loadFeedCache(){ try{return JSON.parse(localStorage.getItem(FEED_KEY))||[];}catch(e){return[];} }
 function saveFeedCache(items){ localStorage.setItem(FEED_KEY,JSON.stringify(items.slice(0,MAX_FEED))); }
 
-function renderDashStatic(){
-  document.getElementById('dash-stats').innerHTML = FEELINGS.map(f=>`
-    <div class="stat-card">
-      <span class="stat-emoji">${f.emoji}</span>
-      <div class="stat-label-d">${f.feeling}</div>
-      <div class="stat-count-d" id="dcnt-${f.feeling}" style="color:${f.color}">0</div>
-      <div class="stat-pct-d"   id="dpct-${f.feeling}">—</div>
-    </div>`).join('');
-  document.getElementById('dash-bars').innerHTML = FEELINGS.map(f=>`
-    <div class="bar-row">
-      <div class="bar-label">${f.emoji} ${f.feeling}</div>
-      <div class="bar-wrap"><div class="bar-fill" id="dbar-${f.feeling}" style="background:${f.color};width:0%"></div></div>
-      <div class="bar-count" id="dbc-${f.feeling}">0</div>
+function renderStats(){
+  document.getElementById('statsGrid').innerHTML = FEELINGS.map(f=>`
+    <div class="fb-stat-card">
+      <span class="fb-stat-emoji">${f.emoji}</span>
+      <div class="fb-stat-label">${f.feeling}</div>
+      <div class="fb-stat-count" id="cnt-${f.feeling}" style="color:${f.color}">0</div>
+      <div class="fb-stat-pct"   id="pct-${f.feeling}">-</div>
     </div>`).join('');
 }
 
-function updateDash(){
-  document.getElementById('dash-total').textContent=dashTotal;
+function renderBars(){
+  document.getElementById('barChart').innerHTML = FEELINGS.map(f=>`
+    <div class="fb-bar-row">
+      <div class="fb-bar-label">${f.emoji} ${f.feeling}</div>
+      <div class="fb-bar-wrap"><div class="fb-bar-fill" id="bar-${f.feeling}" style="background:${f.color};width:0%"></div></div>
+      <div class="fb-bar-count" id="bc-${f.feeling}">0</div>
+    </div>`).join('');
+}
+
+function updateStats(){
+  document.getElementById('totalCount').textContent=total;
   FEELINGS.forEach(f=>{
-    const c=counts[f.feeling]||0, pct=dashTotal?Math.round(c/dashTotal*100):0;
-    document.getElementById('dcnt-'+f.feeling).textContent=c;
-    document.getElementById('dpct-'+f.feeling).textContent=dashTotal?pct+'%':'—';
-    document.getElementById('dbar-'+f.feeling).style.width=pct+'%';
-    document.getElementById('dbc-'+f.feeling).textContent=c;
+    const c=counts[f.feeling]||0, pct=total?Math.round(c/total*100):0;
+    document.getElementById('cnt-'+f.feeling).textContent=c;
+    document.getElementById('pct-'+f.feeling).textContent=total?pct+'%':'-';
+    document.getElementById('bar-'+f.feeling).style.width=pct+'%';
+    document.getElementById('bc-'+f.feeling).textContent=c;
   });
 }
 
+function toNum(v){
+  const n=Number(v);
+  return Number.isFinite(n)?n:null;
+}
+
+function buildLocationTag(data){
+  const floor=(data.floor||'').toString().trim();
+  const room=(data.room||data.room_id||'').toString().trim();
+  const zone=(data.zone||data.area||'').toString().trim();
+  const x=toNum(data.x);
+  const y=toNum(data.y);
+  const locText=(data.location||data.loc||'').toString().trim();
+
+  if(locText) return locText;
+
+  const parts=[];
+  if(floor) parts.push(floor);
+  if(room) parts.push(room);
+  if(zone) parts.push(zone);
+  if(x!==null && y!==null) parts.push(`(${x.toFixed(2)}, ${y.toFixed(2)})`);
+  else if(x!==null) parts.push(`x=${x.toFixed(2)}`);
+  else if(y!==null) parts.push(`y=${y.toFixed(2)}`);
+  if(parts.length) return parts.join(' · ');
+  return `${FLOOR_ID} · ${ROOM_ID}`;
+}
+
+function buildRealtimeGeoText(data){
+  const country=cleanText(data.country || data.country_en || data.country_zh);
+  const city=cleanText(data.city);
+  const district=cleanText(data.district || data.area || data.region);
+  const street=cleanText(data.street || data.road || data.campus);
+  const building=cleanText(data.building || data.block);
+  if(country || city || district || street || building){
+    return composeStructuredLocation({
+      country: country || buildingLocationParts.country,
+      city: city || buildingLocationParts.city,
+      district: district || buildingLocationParts.district,
+      street: street || buildingLocationParts.street,
+      building: building || buildingLocationParts.building
+    });
+  }
+
+  const direct=(data.realtime_location||data.real_time_location||data.current_location||data.address||'').toString().trim();
+  if(direct) return direct;
+
+  const floor=(data.floor||'').toString().trim();
+  const room=(data.room||data.room_id||'').toString().trim();
+
+  const parts=[];
+  if(floor) parts.push(floor);
+  if(room) parts.push(room);
+  if(parts.length){
+    return composeStructuredLocation({
+      country: buildingLocationParts.country,
+      city: buildingLocationParts.city,
+      district: buildingLocationParts.district,
+      street: buildingLocationParts.street,
+      building: `${buildingLocationParts.building} ${parts.join(' ')}`
+    });
+  }
+
+  const lat=toNum(data.lat ?? data.latitude);
+  const lng=toNum(data.lng ?? data.lon ?? data.longitude);
+  if(lat!==null && lng!==null) return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  if(browserLocationParts) return composeStructuredLocation(browserLocationParts);
+  if((browserRealtimeLocation||'').trim()){
+    return composeStructuredLocation(buildingLocationParts)+` (${browserRealtimeLocation.trim()})`;
+  }
+  return composeStructuredLocation(buildingLocationParts);
+}
+
 function addFeedItem(data, prepend=true, save=true){
-  const feed=document.getElementById('dash-feed');
-  const empty=feed.querySelector('.feed-empty'); if(empty) empty.remove();
+  const feed=document.getElementById('feed');
+  const empty=feed.querySelector('.fb-feed-empty'); if(empty) empty.remove();
   const f=FEELINGS.find(x=>x.feeling===data.feeling)||{emoji:'❓',color:'#aaa'};
   const time=new Date(data.timestamp||Date.now()).toLocaleTimeString('zh-CN');
-  const el=document.createElement('div'); el.className='feed-item';
-  el.innerHTML=`<div class="feed-emoji">${f.emoji}</div>
+  const feelingEsc=escapeHtml(data.feeling||'');
+  const clientEsc=escapeHtml((data.client||'').slice(0,12)||'匿名');
+  const sourceTag=(data.source&&data.source!=='unknown')?`<span class="fb-feed-source">📍 ${escapeHtml(data.source)}</span>`:'';
+  const locationText=buildLocationTag(data);
+  const locationTag=locationText?`<span class="fb-feed-location">🧭 ${escapeHtml(locationText)}</span>`:'';
+  const geoTextRaw=buildRealtimeGeoText(data);
+  const geoText=(geoTextRaw&&geoTextRaw.trim())?geoTextRaw.trim():((buildingRealtimeLocation||'').trim()||NETWORK_FALLBACK_BUILDING);
+  const geoTag=`<div class="fb-feed-geo">实时位置：${escapeHtml(geoText)}</div>`;
+  const el=document.createElement('div'); el.className='fb-feed-item';
+  el.innerHTML=`<div class="fb-feed-emoji">${f.emoji}</div>
     <div style="flex:1">
-      <div class="feed-feeling" style="color:${f.color}">${data.feeling}</div>
-      <div class="feed-time">${time} · ${(data.client||'').slice(0,12)||'匿名'}</div>
+      <div class="fb-feed-feeling" style="color:${f.color}">${feelingEsc}</div>
+      <div class="fb-feed-time">${time} · ${clientEsc}</div>
+      ${sourceTag}
+      ${locationTag}
+      ${geoTag}
     </div>`;
   if(prepend) feed.insertBefore(el,feed.firstChild); else feed.appendChild(el);
-  const items=feed.querySelectorAll('.feed-item'); if(items.length>MAX_FEED) items[items.length-1].remove();
-  if(save){ const c=loadFeedCache(); c.unshift({feeling:data.feeling,timestamp:data.timestamp||new Date().toISOString(),client:data.client||''}); saveFeedCache(c); }
+  const items=feed.querySelectorAll('.fb-feed-item'); if(items.length>MAX_FEED) items[items.length-1].remove();
+  if(save){
+    const c=loadFeedCache();
+    c.unshift({
+      feeling:data.feeling,
+      timestamp:data.timestamp||new Date().toISOString(),
+      client:data.client||'',
+      source:data.source||'',
+      location:locationText||'',
+      realtime_location:geoText||'',
+      floor:data.floor||'',
+      room:data.room||data.room_id||'',
+      zone:data.zone||data.area||'',
+      x:toNum(data.x),
+      y:toNum(data.y),
+      lat:toNum(data.lat ?? data.latitude),
+      lng:toNum(data.lng ?? data.lon ?? data.longitude),
+      city:data.city||'',
+      district:data.district||'',
+      building:data.building||data.block||''
+    });
+    saveFeedCache(c);
+  }
 }
 
 function clearFeed(){
   localStorage.removeItem(FEED_KEY);
-  document.getElementById('dash-feed').innerHTML='<div class="feed-empty">等待接收用户反馈…</div>';
+  document.getElementById('feed').innerHTML='<div class="fb-feed-empty">Waiting for feedback...</div>';
 }
 
 function restoreCache(){ loadFeedCache().forEach(item=>addFeedItem(item,false,false)); }
 
+function scoreToFeeling(score){
+  const s=Number(score);
+  if(s<=1) return '很冷';
+  if(s===2) return '有点冷';
+  if(s===3) return '刚刚好';
+  if(s===4) return '有点热';
+  return '极热';
+}
+
+function normalizeFeedbackRecord(e){
+  if(!e) return null;
+  return {
+    feeling: e.feeling || scoreToFeeling(e.score),
+    timestamp: e.timestamp || e.ts || new Date().toISOString(),
+    client: e.client || e.device || '',
+    source: e.source || e.seat || '',
+    floor: e.floor || FLOOR_ID,
+    room: e.room || ROOM_ID,
+    realtime_location: e.realtime_location || e.address || '',
+    lat: e.lat ?? e.latitude,
+    lng: e.lng ?? e.lon ?? e.longitude
+  };
+}
+
+function feedHasItems(){
+  return document.querySelectorAll('#feed .fb-feed-item').length > 0;
+}
+
+function loadRecentFeedFromApi(){
+  fetch(`/api/feedback/${ROOM_ID}`).then(r=>r.json()).then(events=>{
+    const list=Array.isArray(events)?events:[];
+    if(!list.length || feedHasItems()) return;
+    list.slice(-20).forEach((ev)=>{
+      const item=normalizeFeedbackRecord(ev);
+      if(item && item.feeling) addFeedItem(item,false,true);
+    });
+  }).catch(()=>{});
+}
+
+function clearAllData(){
+  if(!confirm('Clear all data (stats + feed)?')) return;
+  localStorage.removeItem(FEED_KEY);
+  FEELINGS.forEach(f=>counts[f.feeling]=0);
+  total=0;
+  updateStats();
+  clearFeed();
+  if(mqttClient && mqttClient.connected){
+    mqttClient.publish(TOPIC_STAT,'',{qos:1,retain:true});
+  }
+}
+
 function initMQTT(){
   mqttClient=mqtt.connect(BROKER,{clientId:'lu-dt-'+Math.random().toString(16).slice(2,10),clean:true,connectTimeout:8000,reconnectPeriod:3000});
   mqttClient.on('connect',()=>{
-    document.getElementById('dash-dot').className='dash-dot on';
-    document.getElementById('dash-status').textContent='Connected to broker.hivemq.com';
+    document.getElementById('dot').className='fb-dot on';
+    document.getElementById('statusVal').textContent='Connected to broker.hivemq.com';
     mqttClient.subscribe([TOPIC,TOPIC_STAT],{qos:1});
   });
   mqttClient.on('message',(topic,payload)=>{
@@ -287,14 +590,20 @@ function initMQTT(){
     try{
       const data=JSON.parse(raw);
       if(topic===TOPIC_STAT){
-        if(!retainedLoaded){ retainedLoaded=true; FEELINGS.forEach(f=>{const v=data[f.feeling];if(v){counts[f.feeling]=v;dashTotal+=v;}}); updateDash(); }
+        if(!retainedLoaded){ retainedLoaded=true; FEELINGS.forEach(f=>{const v=data[f.feeling];if(v){counts[f.feeling]=v;total+=v;}}); updateStats(); }
         return;
       }
-      if(data.feeling){ counts[data.feeling]=(counts[data.feeling]||0)+1; dashTotal++; updateDash(); addFeedItem(data); }
+      const msg=normalizeFeedbackRecord(data);
+      if(msg && msg.feeling){
+        counts[msg.feeling]=(counts[msg.feeling]||0)+1;
+        total++;
+        updateStats();
+        addFeedItem(msg);
+      }
     }catch(e){}
   });
-  mqttClient.on('error',()=>{ document.getElementById('dash-dot').className='dash-dot err'; document.getElementById('dash-status').textContent='Connection failed, retrying…'; });
-  mqttClient.on('close',()=>{ document.getElementById('dash-dot').className='dash-dot err'; document.getElementById('dash-status').textContent='Disconnected, reconnecting…'; });
+  mqttClient.on('error',()=>{ document.getElementById('dot').className='fb-dot err'; document.getElementById('statusVal').textContent='Connection failed, retrying...'; });
+  mqttClient.on('close',()=>{ document.getElementById('dot').className='fb-dot err'; document.getElementById('statusVal').textContent='Disconnected, reconnecting...'; });
 }
 
 function setAdjustDisabled(disabled){
@@ -363,8 +672,10 @@ document.querySelectorAll('[data-setpt-slider]').forEach(slider=>{
   });
 });
 
-renderDashStatic();
+renderStats();
+renderBars();
 restoreCache();
+loadRecentFeedFromApi();
 initMQTT();
 
 // ── Three.js setup ────────────────────────────────────────────────────────────
@@ -410,20 +721,26 @@ const fillLight=new THREE.PointLight(0xfff8f0,.6,40);
 fillLight.position.set(-6,5,6); scene.add(fillLight);
 
 // ── ROOM GEOMETRY ─────────────────────────────────────────────────────────────
-const RW = IS_LIB?22:16, RD=IS_LIB?14:12, RH=3.2;
+const RW = IS_AUDITORIUM ? 20 : (IS_LIB ? 22 : 16);
+const RD = IS_AUDITORIUM ? 20 : (IS_LIB ? 14 : 12);
+const RH = IS_AUDITORIUM ? 6 : 3.2;
 
 // FLOOR
-const floorMat=new THREE.MeshStandardMaterial({color:0xd4b884,roughness:.75});
+const floorMat=IS_AUDITORIUM
+  ? new THREE.MeshStandardMaterial({color:0x2a2d33,roughness:.95,metalness:0.02})
+  : new THREE.MeshStandardMaterial({color:0xd4b884,roughness:.75});
 const floor=new THREE.Mesh(new THREE.BoxGeometry(RW,0.12,RD),floorMat);
 floor.position.set(0,-.06,0); floor.receiveShadow=true; scene.add(floor);
 
-// Floor tile grid lines
-const groutMat=new THREE.MeshBasicMaterial({color:0xc0a870,transparent:true,opacity:.4});
-for(let x=-RW/2;x<=RW/2;x+=1.2){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(.04,.01,RD),groutMat);m.position.set(x,.001,0);scene.add(m);
-}
-for(let z=-RD/2;z<=RD/2;z+=1.2){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(RW,.01,.04),groutMat);m.position.set(0,.001,z);scene.add(m);
+// Floor tile grout (disabled for auditorium carpet)
+if(!IS_AUDITORIUM){
+  const groutMat=new THREE.MeshBasicMaterial({color:0xc0a870,transparent:true,opacity:.4});
+  for(let x=-RW/2;x<=RW/2;x+=1.2){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.04,.01,RD),groutMat);m.position.set(x,.001,0);scene.add(m);
+  }
+  for(let z=-RD/2;z<=RD/2;z+=1.2){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(RW,.01,.04),groutMat);m.position.set(0,.001,z);scene.add(m);
+  }
 }
 
 // WALLS
@@ -497,6 +814,109 @@ function createQRTexture(){
   return tex;
 }
 
+function createTechPPTTexture(){
+  const c=document.createElement('canvas');
+  c.width=1024; c.height=576;
+  const ctx=c.getContext('2d');
+
+  const grad=ctx.createLinearGradient(0,0,c.width,c.height);
+  grad.addColorStop(0,'#0b1b2f');
+  grad.addColorStop(1,'#132b46');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,c.width,c.height);
+
+  // Top title bar
+  ctx.fillStyle='rgba(80,180,255,0.16)';
+  ctx.fillRect(36,30,952,64);
+  ctx.strokeStyle='rgba(120,210,255,0.6)';
+  ctx.lineWidth=2;
+  ctx.strokeRect(36,30,952,64);
+  ctx.fillStyle='#d7f4ff';
+  ctx.font='bold 36px Arial';
+  ctx.fillText('SMART LECTURE ANALYTICS',60,72);
+
+  // Left data panel
+  ctx.fillStyle='rgba(37,75,118,0.45)';
+  ctx.fillRect(46,118,420,408);
+  ctx.strokeStyle='rgba(123,214,255,0.55)';
+  ctx.strokeRect(46,118,420,408);
+  ctx.fillStyle='#9fe9ff';
+  ctx.font='bold 24px Arial';
+  ctx.fillText('REAL-TIME METRICS',70,156);
+
+  const bars=[0.78,0.62,0.86,0.54,0.73];
+  bars.forEach((v,i)=>{
+    const y=190+i*62;
+    ctx.fillStyle='rgba(120,220,255,0.2)';
+    ctx.fillRect(70,y,360,30);
+    ctx.fillStyle='#52d4ff';
+    ctx.fillRect(70,y,360*v,30);
+    ctx.fillStyle='#d2f6ff';
+    ctx.font='18px Arial';
+    ctx.fillText(`KPI-${i+1}`,78,y+21);
+  });
+
+  // Right chart panel
+  ctx.fillStyle='rgba(37,75,118,0.45)';
+  ctx.fillRect(500,118,478,250);
+  ctx.strokeStyle='rgba(123,214,255,0.55)';
+  ctx.strokeRect(500,118,478,250);
+  ctx.fillStyle='#9fe9ff';
+  ctx.font='bold 22px Arial';
+  ctx.fillText('TREND OVERVIEW',524,150);
+  ctx.strokeStyle='#4ee0ff';
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  const points=[0.25,0.42,0.38,0.58,0.66,0.61,0.78,0.84];
+  points.forEach((p,idx)=>{
+    const x=530+idx*56;
+    const y=320-(p*140);
+    if(idx===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  points.forEach((p,idx)=>{
+    const x=530+idx*56;
+    const y=320-(p*140);
+    ctx.fillStyle='#8ef1ff';
+    ctx.beginPath();
+    ctx.arc(x,y,5,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // Bottom-right cards
+  const cards=[
+    {x:500,y:386,w:150,h:140,t:'Energy',v:'82%'},
+    {x:664,y:386,w:150,h:140,t:'Comfort',v:'A+'},
+    {x:828,y:386,w:150,h:140,t:'Engagement',v:'91%'}
+  ];
+  cards.forEach(card=>{
+    ctx.fillStyle='rgba(34,59,94,0.62)';
+    ctx.fillRect(card.x,card.y,card.w,card.h);
+    ctx.strokeStyle='rgba(123,214,255,0.55)';
+    ctx.strokeRect(card.x,card.y,card.w,card.h);
+    ctx.fillStyle='#95e7ff';
+    ctx.font='20px Arial';
+    ctx.fillText(card.t,card.x+16,card.y+38);
+    ctx.fillStyle='#e3fbff';
+    ctx.font='bold 42px Arial';
+    ctx.fillText(card.v,card.x+16,card.y+98);
+  });
+
+  // Subtle scan lines for tech feeling
+  ctx.strokeStyle='rgba(150,220,255,0.06)';
+  ctx.lineWidth=1;
+  for(let y=0;y<c.height;y+=4){
+    ctx.beginPath();
+    ctx.moveTo(0,y); ctx.lineTo(c.width,y);
+    ctx.stroke();
+  }
+
+  const tex=new THREE.CanvasTexture(c);
+  tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate=true;
+  return tex;
+}
+
 const qrMat=new THREE.MeshBasicMaterial({map:createQRTexture(),transparent:false});
 function addDeskQR(x,y,z,size=.16){
   const qr=new THREE.Mesh(new THREE.PlaneGeometry(size,size),qrMat);
@@ -538,7 +958,169 @@ function addSeatedPerson(x,z,dir=0,seatY=.53){
   scene.add(g);
 }
 
-if(!IS_LIB){
+function addStandingPerson(x,y,z,dir=0){
+  const g=new THREE.Group();
+  const shirtMat=new THREE.MeshStandardMaterial({color:0x3f5f8f,roughness:.82});
+  const skinMat=new THREE.MeshStandardMaterial({color:0xd8b79b,roughness:.9});
+  const pantMat=new THREE.MeshStandardMaterial({color:0x2f3542,roughness:.9});
+
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(.34,.52,.2),shirtMat);
+  torso.position.set(0,y+.98,0); torso.castShadow=true; g.add(torso);
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.06,10),skinMat);
+  neck.position.set(0,y+1.28,0); g.add(neck);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12),skinMat);
+  head.position.set(0,y+1.43,0); head.castShadow=true; g.add(head);
+
+  [[-.09,.04],[.09,.04]].forEach(([lx,lz])=>{
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.62,10),pantMat);
+    leg.position.set(lx,y+.55,lz); g.add(leg);
+  });
+  [[-.2,.02,.45],[.2,.02,-.45]].forEach(([ax,az,rz])=>{
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(.03,.032,.42,10),skinMat);
+    arm.position.set(ax,y+1.0,az); arm.rotation.z=rz; g.add(arm);
+  });
+
+  g.position.set(x,0,z); g.rotation.y=dir;
+  scene.add(g);
+}
+
+if(IS_AUDITORIUM){
+  // ── AUDITORIUM: LIB-L fixed geometry (10m x 20m x 10m) ───────────────────
+  const woodMat=new THREE.MeshStandardMaterial({color:0x8f6f4e,roughness:.72});
+  const darkWoodMat=new THREE.MeshStandardMaterial({color:0x5f4736,roughness:.75});
+  const seatMat=new THREE.MeshStandardMaterial({color:0x8f3f3f,roughness:.8});
+  const blackMat=new THREE.MeshStandardMaterial({color:0x22242c,roughness:.7});
+
+  // Main central stage at the front
+  const stageDepth=2.4;
+  const stageHeight=0.4;
+  const stage=new THREE.Mesh(new THREE.BoxGeometry(6.5,stageHeight,stageDepth),woodMat);
+  stage.position.set(0,stageHeight/2,-RD/2+stageDepth/2+0.3);
+  stage.castShadow=true; stage.receiveShadow=true; scene.add(stage);
+
+  // Projection screen centered on stage axis
+  const scrW=3.8, scrH=2.2;
+  const screenFrame=new THREE.Mesh(new THREE.BoxGeometry(scrW+0.16,scrH+0.16,0.12),blackMat);
+  screenFrame.position.set(0,2.2,-RD/2+0.18); scene.add(screenFrame);
+  const screenTex=createTechPPTTexture();
+  const screen=new THREE.Mesh(
+    new THREE.BoxGeometry(scrW,scrH,0.06),
+    new THREE.MeshStandardMaterial({
+      map:screenTex,
+      color:0xffffff,
+      roughness:.2,
+      emissive:0x1f3a55,
+      emissiveIntensity:.2
+    })
+  );
+  screen.position.set(0,2.2,-RD/2+0.24); scene.add(screen);
+
+  // Lectern on audience-right side on +120mm platform
+  const lecternLiftHeight=0.12;
+  const lecternBase=new THREE.Mesh(new THREE.BoxGeometry(1.0,lecternLiftHeight,0.9),darkWoodMat);
+  const lecternX=2.35;
+  const lecternZ=-RD/2+2.0;
+  lecternBase.position.set(lecternX,lecternLiftHeight/2,lecternZ);
+  lecternBase.castShadow=true; lecternBase.receiveShadow=true; scene.add(lecternBase);
+  const lectern=new THREE.Mesh(new THREE.BoxGeometry(0.56,1.05,0.45),darkWoodMat);
+  lectern.position.set(lecternX,lecternLiftHeight+0.525,lecternZ);
+  lectern.castShadow=true; scene.add(lectern);
+  const lecternTop=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.06,0.55),darkWoodMat);
+  lecternTop.position.set(lecternX,lecternLiftHeight+1.05,lecternZ-0.04); scene.add(lecternTop);
+
+  // Audience tiers: contiguous rows (no gaps), 4.0m from stage to first row
+  const rowPitch = 1.8;
+  const rowRise = 0.4;
+  const rowCount = 7;
+  const stairWidth = 0.8;
+  const stageBackZ = stage.position.z + stageDepth/2;
+  const audienceStartZ = stageBackZ + 4.0 + rowPitch/2;
+  const sideClear = 0.8;
+  const seatBlockWidth = RW - sideClear*2 - 1.2;
+  const seatPerRow = 19;
+  const seatSpacing = seatBlockWidth/(seatPerRow-1);
+  const rowSeatPositions = [];
+  for(let r=0;r<rowCount;r++){
+    const rowY = (r+1)*rowRise;
+    const rowZ = audienceStartZ + r*rowPitch;
+    const seatPositions = [];
+
+    // Tier slab for this row (depth equals row pitch => contiguous, no middle gaps)
+    const tier=new THREE.Mesh(new THREE.BoxGeometry(RW-0.8,rowRise,rowPitch),new THREE.MeshStandardMaterial({color:0x6f5a48,roughness:.82}));
+    tier.position.set(0,rowY-rowRise/2,rowZ);
+    tier.receiveShadow=true; scene.add(tier);
+
+    // Side stepped stairs (0.8m each side), synchronized with tier rise
+    const stairMat = new THREE.MeshStandardMaterial({color:0x5b4a3c,roughness:.85});
+    const leftStair=new THREE.Mesh(new THREE.BoxGeometry(stairWidth,rowRise,rowPitch),stairMat);
+    leftStair.position.set(-RW/2+stairWidth/2+0.2,rowY-rowRise/2,rowZ);
+    leftStair.receiveShadow=true; scene.add(leftStair);
+    const rightStair=new THREE.Mesh(new THREE.BoxGeometry(stairWidth,rowRise,rowPitch),stairMat);
+    rightStair.position.set(RW/2-stairWidth/2-0.2,rowY-rowRise/2,rowZ);
+    rightStair.receiveShadow=true; scene.add(rightStair);
+
+    // Straight row distribution
+    for(let c=0;c<seatPerRow;c++){
+      if(c < 2 || c > seatPerRow - 3) continue;
+      const local = c-(seatPerRow-1)/2;
+      const x = local*seatSpacing;
+      const seatZ = rowZ;
+      const yaw = 0;
+
+      const seat=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.08,0.62),seatMat);
+      seat.position.set(x,rowY+0.05,seatZ);
+      seat.castShadow=true; scene.add(seat);
+      const back=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.75,0.09),seatMat);
+      back.position.set(x,rowY+0.45,seatZ+0.26);
+      back.castShadow=true; scene.add(back);
+      const armL=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.22,0.44),blackMat);
+      armL.position.set(x-0.34,rowY+0.14,seatZ+0.04); scene.add(armL);
+      const armR=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.22,0.44),blackMat);
+      armR.position.set(x+0.34,rowY+0.14,seatZ+0.04); scene.add(armR);
+      seat.rotation.y = yaw;
+      back.rotation.y = yaw;
+      armL.rotation.y = yaw;
+      armR.rotation.y = yaw;
+      seatPositions.push({x, z: seatZ, y: rowY});
+    }
+    rowSeatPositions.push(seatPositions);
+  }
+
+  // One speaker at lectern
+  addStandingPerson(lecternX-0.02, lecternLiftHeight, lecternZ-0.22, Math.PI);
+
+  // 10-15 seated people per row (randomized)
+  rowSeatPositions.forEach((seats)=>{
+    if(!seats.length) return;
+    const target = Math.min(seats.length, 10 + Math.floor(Math.random()*6));
+    const pool = seats.slice();
+    for(let i=pool.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      const tmp = pool[i]; pool[i]=pool[j]; pool[j]=tmp;
+    }
+    for(let i=0;i<target;i++){
+      const s = pool[i];
+      addSeatedPerson(s.x, s.z, Math.PI, s.y+0.06);
+    }
+  });
+
+  // Wood slat style ceiling for 10m high space
+  for(let i=0;i<6;i++){
+    const cx=(i-2.5)*1.6;
+    const slat=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,RD*0.92),woodMat);
+    slat.position.set(cx,RH-0.15,0);
+    scene.add(slat);
+  }
+
+  // Additional focused lights
+  const spotA=new THREE.SpotLight(0xfff2df,0.8,35,Math.PI/6,0.3,1.2);
+  spotA.position.set(0,8,-3.5); spotA.target.position.set(0,1,-8.4);
+  scene.add(spotA); scene.add(spotA.target);
+  const spotB=new THREE.SpotLight(0xfff2df,0.6,35,Math.PI/6,0.3,1.2);
+  spotB.position.set(2.8,8,-2.8); spotB.target.position.set(2.35,1,-8.0);
+  scene.add(spotB); scene.add(spotB.target);
+
+} else if(!IS_LIB){
   // ── CLASSROOM: projector screen + rows of desks ───────────────────────────
   // Projector screen on back wall
   const screen=new THREE.Mesh(new THREE.BoxGeometry(RW*.7,.1,1.8),boardMat);

@@ -1,6 +1,8 @@
 """Lingnan University SCADA — Flask server   http://localhost:6010"""
 import json, os
 from datetime import datetime
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from flask import Flask, jsonify, render_template, abort, request
 from flask_cors import CORS
 
@@ -11,13 +13,17 @@ SETPOINT_MAX = 36
 
 def _load(n):
     p = os.path.join(DATA, n)
-    return json.load(open(p)) if os.path.exists(p) else None
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
 
 TS      = _load("timestamps.json")
 ROOMS_TS= _load("rooms_ts.json")
 WEATHER = _load("weather.json")
 FB      = _load("feedback.json")
 META    = _load("rooms_meta.json")
+BUILDING = _load("building.json")
 READY   = all(x is not None for x in [TS,ROOMS_TS,WEATHER,FB,META])
 SETPOINT_OVERRIDE = {}
 
@@ -73,6 +79,52 @@ def api_fb_room(rid): return jsonify([e for e in (FB or []) if e["room"]==rid][-
 def api_fb_floor(fid): return jsonify([e for e in (FB or []) if e["floor"]==fid][-100:])
 @app.route("/api/meta")
 def api_meta():    return jsonify(META)
+
+@app.route("/api/building")
+def api_building():
+    return jsonify(BUILDING or {})
+
+@app.route("/api/reverse-geocode")
+def api_reverse_geocode():
+    try:
+        lat = float(request.args.get("lat", ""))
+        lng = float(request.args.get("lng", ""))
+    except (TypeError, ValueError):
+        abort(400, description="lat and lng are required numeric query parameters")
+
+    q = urlencode({
+        "lat": f"{lat:.7f}",
+        "lon": f"{lng:.7f}",
+        "format": "jsonv2",
+        "addressdetails": 1
+    })
+    url = f"https://nominatim.openstreetmap.org/reverse?{q}"
+    req = Request(url, headers={
+        "User-Agent": "University-SCADA/1.0 (reverse-geocode)"
+    })
+    try:
+        with urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return jsonify({"ok": False}), 502
+
+    addr = data.get("address") or {}
+    city = addr.get("city") or addr.get("town") or addr.get("village") or ""
+    district = addr.get("suburb") or addr.get("city_district") or addr.get("county") or addr.get("state_district") or ""
+    street = addr.get("road") or addr.get("pedestrian") or addr.get("neighbourhood") or ""
+    building = addr.get("building") or addr.get("house_number") or addr.get("amenity") or addr.get("commercial") or ""
+
+    return jsonify({
+        "ok": True,
+        "country": addr.get("country") or "",
+        "city": city,
+        "district": district,
+        "street": street,
+        "building": building,
+        "display_name": data.get("display_name") or "",
+        "lat": lat,
+        "lng": lng
+    })
 
 @app.route("/api/room/<rid>/setpoint", methods=["POST"])
 def api_room_setpoint(rid):

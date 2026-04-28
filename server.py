@@ -154,4 +154,7 @@ if __name__ == "__main__":
     print(f"\n[{'OK' if READY else '!'}] {'Data loaded' if READY else 'Run simulate_data.py first'}")
     if FB: print(f"    {len(FB)} feedback events")
     print("[>] http://localhost:6012\n")
-    app.run(host="0.0.0.0", port=6012, debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 6012)), debug=False)
+
+
+
